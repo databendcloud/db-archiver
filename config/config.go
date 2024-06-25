@@ -22,8 +22,7 @@ type Config struct {
 	DatabendDSN      string `json:"databendDSN" default:"localhost:8000"`
 	DatabendTable    string `json:"databendTable"`
 	BatchSize        int    `json:"batchSize" default:"1000"`
-	BatchMaxInterval int    `json:"batchMaxInterval" default:"30"`
-	Workers          int    `json:"workers" default:"1"`
+	BatchMaxInterval int    `json:"batchMaxInterval" default:"3"`
 
 	// related docs: https://docs.databend.com/sql/sql-commands/dml/dml-copy-into-table
 	CopyPurge           bool   `json:"copyPurge" default:"false"`
@@ -31,10 +30,6 @@ type Config struct {
 	DisableVariantCheck bool   `json:"disableVariantCheck" default:"false"`
 	UserStage           string `json:"userStage" default:"~"`
 	DeleteAfterSync     bool   `json:"deleteAfterSync" default:"false"`
-
-	// 多表并行归档
-	// 生成配置文件，
-	// 限流的情况
 }
 
 func LoadConfig() (*Config, error) {

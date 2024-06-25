@@ -12,7 +12,6 @@
   "databendTable": "testSync.my_table",
   "batchSize": 2,
   "batchMaxInterval": 30,
-  "workers": 1,
   "copyPurge": false,
   "copyForce": false,
   "disableVariantCheck": false,
