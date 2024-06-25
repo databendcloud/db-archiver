@@ -52,22 +52,22 @@ INFO[0000] Starting worker worker-1
 
 
 ## Parameter References
-| Parameter             | Description              | Default             | example                         |
-|-----------------------|--------------------------|---------------------|---------------------------------|
-| sourceHost            | source host              |
-| sourcePort            | source port              | 3306                | 3306                            |
-| sourceUser            | source user              |
-| sourcePass            | source password          |
-| sourceDB              | source database          |
-| sourceTable           | source table             |
-| sourceQuery           | source query             |
-| sourceWhereCondition  | source where condition   |
-| sourceSplitKey        | source split key         | no                  | "id"                            |
-| databendDSN           | databend dsn             | no                  | "http://localhost:8000"         |
-| databendTable         | databend table           | no                  | "db1.tbl"                       |
-| batchSize             | batch size               | 1000                | 1000                            |
-| batchMaxInterval      | batch max interval       | 30                  | 30                              |
-| copyPurge             | copy purge               | false               | false                           |
-| copyForce             | copy force               | false               | false                           |
-| DisableVariantCheck   | disable variant check    | false               | false                           |
-| userStage             | user external stage name | ~                   | ~                               |
+| Parameter             | Description              | Default | example                 | required   |
+|-----------------------|--------------------------|---------|-------------------------|------------|
+| sourceHost            | source host              |         |                         | true       |
+| sourcePort            | source port              | 3306    | 3306                    | true |
+| sourceUser            | source user              |         |                         | true|
+| sourcePass            | source password          |         |                         | true                    |
+| sourceDB              | source database          |         |                         | true                    |
+| sourceTable           | source table             |         |                         | true                    |
+| sourceQuery           | source query             |         |                         | true                    |
+| sourceWhereCondition  | source where condition   |         |                         | false                   |
+| sourceSplitKey        | source split key         | no      | "id"                    | true       |
+| databendDSN           | databend dsn             | no      | "http://localhost:8000" | true       |
+| databendTable         | databend table           | no      | "db1.tbl"               | true       |
+| batchSize             | batch size               | 1000    | 1000                    | false      |
+| batchMaxInterval      | batch max interval       | 30      | 30                      | false      |
+| copyPurge             | copy purge               | false   | false                   | false      |
+| copyForce             | copy force               | false   | false                   | false      |
+| DisableVariantCheck   | disable variant check    | false   | false                   | false      |
+| userStage             | user external stage name | ~       | ~                       | false      |
