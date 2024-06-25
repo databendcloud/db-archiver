@@ -31,7 +31,7 @@ func main() {
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	w := worker.NewWorker(cfg, fmt.Sprintf("worker-%d", 1), ig, src)
+	w := worker.NewWorker(cfg, fmt.Sprintf("worker"), ig, src)
 	go func() {
 		w.Run(ctx)
 		wg.Done()

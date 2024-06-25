@@ -22,7 +22,7 @@ type Config struct {
 	DatabendDSN      string `json:"databendDSN" default:"localhost:8000"`
 	DatabendTable    string `json:"databendTable"`
 	BatchSize        int    `json:"batchSize" default:"1000"`
-	BatchMaxInterval int    `json:"batchMaxInterval" default:"3"`
+	BatchMaxInterval int    `json:"batchMaxInterval" default:"3"` // for rate limit control
 
 	// related docs: https://docs.databend.com/sql/sql-commands/dml/dml-copy-into-table
 	CopyPurge           bool   `json:"copyPurge" default:"false"`

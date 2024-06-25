@@ -42,7 +42,7 @@ Run the tool and start your sync:
 
 The log output:
 ```
-INFO[0000] Starting worker worker-1                     
+INFO[0000] Starting worker              
 2024/06/25 11:35:37 ingest 2 rows (0.565646 rows/s), 64 bytes (18.100678 bytes/s)
 2024/06/25 11:35:38 ingest 1 rows (0.556652 rows/s), 33 bytes (17.812853 bytes/s)
 2024/06/25 11:35:38 ingest 2 rows (0.551906 rows/s), 65 bytes (17.660995 bytes/s)
@@ -71,3 +71,5 @@ INFO[0000] Starting worker worker-1
 | copyForce             | copy force               | false   | false                   | false      |
 | DisableVariantCheck   | disable variant check    | false   | false                   | false      |
 | userStage             | user external stage name | ~       | ~                       | false      |
+
+NOTE: To reduce the server load, we set the `sourceSplitKey` which is the primary key of the source table. The tool will split the data by the `sourceSplitKey` and sync the data to Databend in parallel.
