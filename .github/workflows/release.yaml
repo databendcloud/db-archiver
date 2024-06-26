@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-release-asset@v1.0.2
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: .cmd/_bin/db-archiver/db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz
+          asset_path: _bin/db-archiver/db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz
           asset_name: db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz
           asset_content_type: binary/octet-stream
       - name: Post sha256
