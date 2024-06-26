@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  release:
+    types:
+      - created
+
+env:
+  # Common versions
+  GO_VERSION: '1.21'
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build_and_upload:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        TARGETS: [ linux/amd64, darwin/amd64, windows/amd64, linux/arm64, darwin/arm64 ]
+    env:
+      GO_BUILD_ENV: GO111MODULE=on CGO_ENABLED=0
+      DIST_DIRS: find * -type d -exec
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Get release
+        id: get_release
+        uses: bruceadams/get-release@v1.2.2
+      - name: Get matrix
+        id: get_matrix
+        run: |
+          TARGETS=${{matrix.TARGETS}}
+          echo ::set-output name=OS::${TARGETS%/*}
+          echo ::set-output name=ARCH::${TARGETS#*/}
+      - name: Build
+        run: |
+          ${{ env.GO_BUILD_ENV }} GOOS=${{ steps.get_matrix.outputs.OS }} GOARCH=${{ steps.get_matrix.outputs.ARCH }} \
+            go build \
+            -o _bin/db-archiver/${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}/db-archiver
+      - name: Compress
+        run: |
+          cd _bin/db-archiver && \
+          ${{ env.DIST_DIRS }} cp ../../LICENSE {} \; && \
+          ${{ env.DIST_DIRS }} cp ../../README.md {} \; && \
+          ${{ env.DIST_DIRS }} tar -zcf db-archiver-{}.tar.gz {} \; && \
+          cd .. && \
+          sha256sum db-archiver/db-archiver-* >> sha256-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.txt \
+      - name: Upload db-archiver tar.gz
+        uses: actions/upload-release-asset@v1.0.2
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: ./_bin/db-archiver/db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz
+          asset_name: db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz
+          asset_content_type: binary/octet-stream
+      - name: Post sha256
+        uses: actions/upload-artifact@v2
+        with:
+          name: sha256sums
+          path: ./_bin/sha256-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.txt
+          retention-days: 1
+  upload-sha256sums-plugin:
+    needs: build_and_upload
+    runs-on: ubuntu-latest
+    name: upload-sha256sums
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Get release
+        id: get_release
+        uses: bruceadams/get-release@v1.2.2
+      - name: Download sha256sums
+        uses: actions/download-artifact@v2
+        with:
+          name: sha256sums
+      - shell: bash
+        run: |
+          for file in *.txt
+          do
+            cat ${file} >> sha256sums.txt
+          done
+      - name: Upload Checksums
+        uses: actions/upload-release-asset@v1.0.2
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: sha256sums.txt
+          asset_name: sha256sums.txt
+          asset_content_type: text/plain
