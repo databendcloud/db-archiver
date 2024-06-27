@@ -200,6 +200,10 @@ func (s *Source) SplitCondition(minSplitKey, maxSplitKey int) []string {
 func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, allMax int) []string {
 	var conditions []string
 	for {
+		if minSplitKey+s.cfg.BatchSize > maxSplitKey {
+			conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey))
+			break
+		}
 		if minSplitKey >= maxSplitKey {
 			if maxSplitKey == allMax {
 				conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey))

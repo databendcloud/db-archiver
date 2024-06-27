@@ -76,6 +76,7 @@ func (w *Worker) stepBatch() error {
 					logrus.Errorf("stepBatchWithCondition failed: %v", err)
 				}
 				for _, condition := range conditions {
+					logrus.Infof("condition: %s", condition)
 					err := w.stepBatchWithCondition(condition)
 					if err != nil {
 						logrus.Errorf("stepBatchWithCondition failed: %v", err)
