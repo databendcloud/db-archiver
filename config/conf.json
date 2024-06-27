@@ -16,5 +16,6 @@
   "copyForce": false,
   "disableVariantCheck": false,
   "userStage": "~",
-  "deleteAfterSync": false
+  "deleteAfterSync": false,
+  "maxThread": 2
 }

@@ -51,11 +51,40 @@ func (w *Worker) stepBatchWithCondition(conditionSql string) error {
 	return nil
 }
 
+func (w *Worker) IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, batchSize int) bool {
+	return (maxSplitKey-minSplitKey)/batchSize > w.cfg.MaxThread
+}
+
 func (w *Worker) stepBatch() error {
 	wg := &sync.WaitGroup{}
 	minSplitKey, maxSplitKey, err := w.src.GerMinMaxSplitKey()
 	if err != nil {
 		return err
+	}
+	fmt.Println("minSplitKey", minSplitKey, "maxSplitKey", maxSplitKey)
+
+	if w.IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, w.cfg.BatchSize) {
+		fmt.Println("split according maxGoRoutine", w.cfg.MaxThread)
+		slimedRange := w.src.SlimCondition(minSplitKey, maxSplitKey)
+		fmt.Println("slimedRange", slimedRange)
+		wg.Add(w.cfg.MaxThread)
+		for i := 0; i < w.cfg.MaxThread; i++ {
+			go func(idx int) {
+				defer wg.Done()
+				conditions := w.src.SplitConditionAccordingMaxGoRoutine(slimedRange[idx][0], slimedRange[idx][1], maxSplitKey)
+				if err != nil {
+					logrus.Errorf("stepBatchWithCondition failed: %v", err)
+				}
+				for _, condition := range conditions {
+					err := w.stepBatchWithCondition(condition)
+					if err != nil {
+						logrus.Errorf("stepBatchWithCondition failed: %v", err)
+					}
+				}
+			}(i)
+		}
+		wg.Wait()
+		return nil
 	}
 	conditions := w.src.SplitCondition(minSplitKey, maxSplitKey)
 	for _, condition := range conditions {
