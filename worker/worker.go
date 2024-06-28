@@ -72,6 +72,7 @@ func (w *Worker) stepBatch() error {
 			go func(idx int) {
 				defer wg.Done()
 				conditions := w.src.SplitConditionAccordingMaxGoRoutine(slimedRange[idx][0], slimedRange[idx][1], maxSplitKey)
+				logrus.Infof("conditions in one routine: %v", conditions)
 				if err != nil {
 					logrus.Errorf("stepBatchWithCondition failed: %v", err)
 				}
