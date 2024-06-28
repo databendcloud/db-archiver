@@ -33,10 +33,10 @@ type Config struct {
 	MaxThread           int    `json:"maxThread" default:"2"`
 }
 
-func LoadConfig() (*Config, error) {
+func LoadConfig(configFile string) (*Config, error) {
 	conf := Config{}
 
-	f, err := os.Open("config/conf.json")
+	f, err := os.Open(configFile)
 	if err != nil {
 		return nil, err
 	}

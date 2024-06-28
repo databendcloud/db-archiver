@@ -125,4 +125,10 @@ func (w *Worker) Run(ctx context.Context) {
 			logrus.Errorf("DeleteAfterSync failed: %v, please do it mannually", err)
 		}
 	}
+	syncedCount, err := w.ig.GetAllSyncedCount()
+	if err != nil {
+		logrus.Errorf("GetAllSyncedCount failed: %v", err)
+	}
+
+	fmt.Println("all syncedCount is:", syncedCount)
 }

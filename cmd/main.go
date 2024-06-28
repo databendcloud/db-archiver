@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -27,7 +28,17 @@ func main() {
 		cancel()
 	}()
 
-	cfg := parseConfigWithFile()
+	configFile := flag.String("f", "", "Path to the configuration file")
+	flag.Parse()
+
+	if *configFile == "" {
+		*configFile = "config/conf.json"
+		if _, err := os.Stat(*configFile); os.IsNotExist(err) {
+			fmt.Printf("json config file does not exist, you can use -f to specify it.Example: ./dbarchiver -f conf.json \n")
+			os.Exit(1)
+		}
+	}
+	cfg := parseConfigWithFile(*configFile)
 	ig := ingester.NewDatabendIngester(cfg)
 	src, err := source.NewSource(cfg)
 	if err != nil {
@@ -46,8 +57,8 @@ func main() {
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
 }
 
-func parseConfigWithFile() *config.Config {
-	cfg, err := config.LoadConfig()
+func parseConfigWithFile(configFile string) *config.Config {
+	cfg, err := config.LoadConfig(configFile)
 	if err != nil {
 		panic(err)
 	}
