@@ -37,7 +37,7 @@ Config your database and Databend connection in `config/conf.json`:
 
 Run the tool and start your sync:
 ```bash
-./db-archiver
+./db-archiver -f conf.json
 ```
 
 The log output:
