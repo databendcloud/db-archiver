@@ -96,6 +96,21 @@ func (s *Source) GerMinMaxSplitKey() (int, int, error) {
 	return minSplitKey, maxSplitKey, nil
 }
 
+func (s *Source) SlimCondition(minSplitKey, maxSplitKey int) [][]int {
+	var conditions [][]int
+	rangeSize := (maxSplitKey - minSplitKey) / s.cfg.MaxThread
+	for i := 0; i < s.cfg.MaxThread; i++ {
+		lowerBound := minSplitKey + rangeSize*i
+		upperBound := lowerBound + rangeSize
+		if i == s.cfg.MaxThread-1 {
+			// Ensure the last condition includes maxSplitKey
+			upperBound = maxSplitKey
+		}
+		conditions = append(conditions, []int{lowerBound, upperBound})
+	}
+	return conditions
+}
+
 func (s *Source) DeleteAfterSync() error {
 	if s.cfg.DeleteAfterSync {
 		_, err := s.db.Exec(fmt.Sprintf("delete from %s.%s where %s", s.cfg.SourceDB,
@@ -178,6 +193,26 @@ func (s *Source) SplitCondition(minSplitKey, maxSplitKey int) []string {
 		}
 		conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, minSplitKey+s.cfg.BatchSize))
 		minSplitKey += s.cfg.BatchSize
+	}
+	return conditions
+}
+
+func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, allMax int) []string {
+	var conditions []string
+	for {
+		if minSplitKey >= maxSplitKey {
+			if minSplitKey > allMax {
+				return conditions
+			}
+			if maxSplitKey == allMax {
+				conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey))
+			} else {
+				conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey))
+			}
+			break
+		}
+		conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, minSplitKey+s.cfg.BatchSize-1))
+		minSplitKey += s.cfg.BatchSize - 1
 	}
 	return conditions
 }

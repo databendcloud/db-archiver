@@ -30,6 +30,7 @@ type Config struct {
 	DisableVariantCheck bool   `json:"disableVariantCheck" default:"false"`
 	UserStage           string `json:"userStage" default:"~"`
 	DeleteAfterSync     bool   `json:"deleteAfterSync" default:"false"`
+	MaxThread           int    `json:"maxThread" default:"2"`
 }
 
 func LoadConfig() (*Config, error) {
