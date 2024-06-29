@@ -98,10 +98,6 @@ func (s *Source) GerMinMaxSplitKey() (int, int, error) {
 
 func (s *Source) SlimCondition(minSplitKey, maxSplitKey int) [][]int {
 	var conditions [][]int
-	if minSplitKey > maxSplitKey {
-		return [][]int{}
-	}
-	// TODO: consider minSplitKey == maxSplitKey
 	rangeSize := (maxSplitKey - minSplitKey) / s.cfg.MaxThread
 	for i := 0; i < s.cfg.MaxThread; i++ {
 		lowerBound := minSplitKey + rangeSize*i
@@ -203,6 +199,10 @@ func (s *Source) SplitCondition(minSplitKey, maxSplitKey int) []string {
 
 func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, allMax int) []string {
 	var conditions []string
+	if minSplitKey > maxSplitKey {
+		return conditions
+	}
+
 	for {
 		if minSplitKey >= maxSplitKey {
 			if minSplitKey > allMax {
