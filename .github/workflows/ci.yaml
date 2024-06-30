@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      databend:
+        # image: datafuselabs/databend-query
+        image: datafuselabs/databend
+        env:
+          QUERY_DEFAULT_USER: databend
+          QUERY_DEFAULT_PASSWORD: databend
+          MINIO_ENABLED: true
+        ports:
+          - 8000:8000
+          - 9000:9000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Verify Service Running
+        run: |
+          sleep 60
+          curl -v http://localhost:8000/v1/health
+
+      - name: Test
+        env:
+          TEST_DATABEND_DSN: "http://databend:databend@localhost:8000/default"
+          TEST_KAFKA_BROKER: "localhost:9092"
+        run: |
+          go test -v -p 1 -cover ./...
