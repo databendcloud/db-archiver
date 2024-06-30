@@ -20,7 +20,8 @@ type Config struct {
 	SourceQuery          string `json:"sourceQuery"`          // select * from table where condition
 	SourceWhereCondition string `json:"sourceWhereCondition"` //example: where id > 100 and id < 200 and time > '2023-01-01'
 	SourceSplitKey       string `json:"sourceSplitKey"`       // primary split key for split table, only for int type
-	SourceSplitTimeKey   string `json:"SourceSplitTimeKey"`   // time field for split table
+	// the format of time field must be: 2006-01-02 15:04:05
+	SourceSplitTimeKey string `json:"SourceSplitTimeKey"` // time field for split table
 
 	// Databend configuration
 	DatabendDSN      string `json:"databendDSN" default:"localhost:8000"`
@@ -51,6 +52,7 @@ func LoadConfig(configFile string) (*Config, error) {
 		fmt.Println("Error decoding JSON:", err)
 		return &conf, err
 	}
+	preCheckConfig(&conf)
 
 	return &conf, nil
 }
@@ -77,8 +79,8 @@ func preCheckConfig(cfg *Config) {
 }
 
 func validateSourceSplitTimeKey(value string) error {
-	// 正则表达式匹配 field>x and field <y 或者 field >= x and field <=y, 或者 field >=x and field <y, 或者 field>x and field <=y 的格式
-	pattern := `^\w+\s*(>|>=)\s*x\s+and\s+\w+\s*(<|<=)\s*y$`
+	// 正则表达式匹配 field>'x' and field <'y' 或者 field >= 'x' and field <='y', 或者 field >='x' and field <'y', 或者 field>'x' and field <='y' 的格式
+	pattern := `^\w+\s*(>|>=)\s*'[^']*'\s+and\s+\w+\s*(<|<=)\s*'[^']*'$`
 	matched, err := regexp.MatchString(pattern, value)
 	if err != nil {
 		return err

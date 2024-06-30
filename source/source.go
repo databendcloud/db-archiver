@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
@@ -240,6 +241,35 @@ func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, a
 		minSplitKey += s.cfg.BatchSize - 1
 	}
 	return conditions
+}
+
+func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeSplitKey string) ([]string, error) {
+	var conditions []string
+
+	// Parse the time strings
+	minTime, err := time.Parse("2006-01-02 15:04:05", minTimeSplitKey)
+	if err != nil {
+		return nil, err
+	}
+
+	maxTime, err := time.Parse("2006-01-02 15:04:05", maxTimeSplitKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Iterate over the time range by 10 minutes
+	for t := minTime; t.Before(maxTime); t = t.Add(10 * time.Minute) {
+		nextDay := t.Add(24 * time.Hour)
+		if nextDay.After(maxTime) {
+			nextDay = maxTime
+		}
+
+		// Construct the condition
+		condition := fmt.Sprintf("(%s >= '%s' and %s < '%s')", s.cfg.SourceSplitTimeKey, t.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, nextDay.Format("2006-01-02 15:04:05"))
+		conditions = append(conditions, condition)
+	}
+
+	return conditions, nil
 }
 
 func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, error) {

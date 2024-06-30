@@ -101,3 +101,38 @@ func TestSplitConditionAccordingMaxGoRoutine(t *testing.T) {
 		t.Errorf("Expected 0 conditions, got %d", len(conditions))
 	}
 }
+
+func TestSplitConditionAccordingToTimeSplitKey(t *testing.T) {
+	cfg := &config.Config{
+		SourceSplitTimeKey: "t1",
+	}
+	source, _ := NewMockSource(cfg)
+
+	// Test when minTimeSplitKey is less than maxTimeSplitKey
+	conditions, err := source.SplitConditionAccordingToTimeSplitKey("2024-06-30 2:00:00", "2024-06-30 20:00:00")
+	fmt.Println(conditions)
+	if err != nil {
+		t.Errorf("SplitConditionAccordingToTimeSplitKey() error = %v", err)
+	}
+	if len(conditions) != 108 {
+		t.Errorf("Expected 108 conditions, got %d", len(conditions))
+	}
+
+	// Test when minTimeSplitKey is equal to maxTimeSplitKey
+	conditions, err = source.SplitConditionAccordingToTimeSplitKey("2024-06-30 2:00:00", "2024-06-30 2:00:00")
+	if err != nil {
+		t.Errorf("SplitConditionAccordingToTimeSplitKey() error = %v", err)
+	}
+	if len(conditions) != 0 {
+		t.Errorf("Expected 0 conditions, got %d", len(conditions))
+	}
+
+	// Test when minTimeSplitKey is greater than maxTimeSplitKey
+	conditions, err = source.SplitConditionAccordingToTimeSplitKey("2024-06-30 20:00:00", "2024-06-30 2:00:00")
+	if err != nil {
+		t.Errorf("SplitConditionAccordingToTimeSplitKey() error = %v", err)
+	}
+	if len(conditions) != 0 {
+		t.Errorf("Expected 0 conditions, got %d", len(conditions))
+	}
+}

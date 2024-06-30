@@ -12,37 +12,43 @@ func TestValidateSourceSplitTimeKey(t *testing.T) {
 	}{
 		{
 			name:    "valid format 1",
-			value:   "field > x and field < y",
+			value:   "t1 > '2024-06-30 2:00:00' and t1 < '2024-06-30 20:00:00'",
 			wantErr: false,
 		},
 		{
+			name:    "valid format 1",
+			value:   "t1>'2024-06-30 2:00:00' and t1< '2024-06-30 20:00:00'",
+			wantErr: false,
+		},
+
+		{
 			name:    "valid format 2",
-			value:   "field >= x and field <= y",
+			value:   "field >= 'x' and field <= 'y'",
 			wantErr: false,
 		},
 		{
 			name:    "valid format 3",
-			value:   "field >= x and field < y",
+			value:   "field >= 'x' and field < 'y'",
 			wantErr: false,
 		},
 		{
 			name:    "valid format 4",
-			value:   "field > x and field <= y",
+			value:   "field > 'x' and field <= 'y'",
 			wantErr: false,
 		},
 		{
 			name:    "invalid format",
-			value:   "field > x and field y",
+			value:   "field > 'x' and field 'y'",
 			wantErr: true,
 		},
 		{
 			name:    "invalid format",
-			value:   "field > x",
+			value:   "field > 'x'",
 			wantErr: true,
 		},
 		{
 			name:    "invalid format",
-			value:   "field >= x",
+			value:   "field >= 'x'",
 			wantErr: true,
 		},
 	}
