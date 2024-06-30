@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
+
+	"github.com/pkg/errors"
 )
 
 type Config struct {
@@ -17,6 +20,7 @@ type Config struct {
 	SourceQuery          string `json:"sourceQuery"`          // select * from table where condition
 	SourceWhereCondition string `json:"sourceWhereCondition"` //example: where id > 100 and id < 200 and time > '2023-01-01'
 	SourceSplitKey       string `json:"sourceSplitKey"`       // primary split key for split table, only for int type
+	SourceSplitTimeKey   string `json:"SourceSplitTimeKey"`   // time field for split table
 
 	// Databend configuration
 	DatabendDSN      string `json:"databendDSN" default:"localhost:8000"`
@@ -49,4 +53,38 @@ func LoadConfig(configFile string) (*Config, error) {
 	}
 
 	return &conf, nil
+}
+
+func preCheckConfig(cfg *Config) {
+	if cfg.SourceSplitKey != "" && cfg.SourceSplitTimeKey != "" {
+		panic("cannot set both sourceSplitKey and sourceSplitTimeKey")
+	}
+	if cfg.SourceSplitKey == "" && cfg.SourceSplitTimeKey == "" {
+		panic("must set one of sourceSplitKey and sourceSplitTimeKey")
+	}
+	if cfg.SourceSplitTimeKey != "" || cfg.SourceSplitKey != "" {
+		if cfg.SourceWhereCondition == "" {
+			panic("must set sourceWhereCondition when sourceSplitTimeKey is set")
+		}
+	}
+	if cfg.SourceSplitTimeKey != "" {
+		// time warehouse condition must be  x < time < y
+		err := validateSourceSplitTimeKey(cfg.SourceSplitTimeKey)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func validateSourceSplitTimeKey(value string) error {
+	// 正则表达式匹配 field>x and field <y 或者 field >= x and field <=y, 或者 field >=x and field <y, 或者 field>x and field <=y 的格式
+	pattern := `^\w+\s*(>|>=)\s*x\s+and\s+\w+\s*(<|<=)\s*y$`
+	matched, err := regexp.MatchString(pattern, value)
+	if err != nil {
+		return err
+	}
+	if !matched {
+		return errors.New("SourceSplitTimeKey does not match the required format")
+	}
+	return nil
 }

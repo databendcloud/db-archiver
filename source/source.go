@@ -78,7 +78,7 @@ func (s *Source) GetRows(conditionSql string) (*sql.Rows, error) {
 	return rows, nil
 }
 
-func (s *Source) GerMinMaxSplitKey() (int, int, error) {
+func (s *Source) GetMinMaxSplitKey() (int, int, error) {
 	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitKey,
 		s.cfg.SourceSplitKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
 	if err != nil {
@@ -91,6 +91,24 @@ func (s *Source) GerMinMaxSplitKey() (int, int, error) {
 		err = rows.Scan(&minSplitKey, &maxSplitKey)
 		if err != nil {
 			return 0, 0, err
+		}
+	}
+	return minSplitKey, maxSplitKey, nil
+}
+
+func (s *Source) GetMinMaxTimeSplitKey() (string, string, error) {
+	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitKey,
+		s.cfg.SourceSplitKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
+	if err != nil {
+		return "", "", err
+	}
+	defer rows.Close()
+
+	var minSplitKey, maxSplitKey string
+	for rows.Next() {
+		err = rows.Scan(&minSplitKey, &maxSplitKey)
+		if err != nil {
+			return "", "", err
 		}
 	}
 	return minSplitKey, maxSplitKey, nil

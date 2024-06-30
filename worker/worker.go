@@ -57,7 +57,7 @@ func (w *Worker) IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, batchSiz
 
 func (w *Worker) stepBatch() error {
 	wg := &sync.WaitGroup{}
-	minSplitKey, maxSplitKey, err := w.src.GerMinMaxSplitKey()
+	minSplitKey, maxSplitKey, err := w.src.GetMinMaxSplitKey()
 	if err != nil {
 		return err
 	}
@@ -100,6 +100,16 @@ func (w *Worker) stepBatch() error {
 		}(condition)
 	}
 	wg.Wait()
+	return nil
+}
+
+func (w *Worker) StepBatchByTimeSplitKey() error {
+	minSplitKey, maxSplitKey, err := w.src.GetMinMaxTimeSplitKey()
+	if err != nil {
+		return err
+	}
+	fmt.Println("minSplitKey", minSplitKey, "maxSplitKey", maxSplitKey)
+
 	return nil
 }
 
