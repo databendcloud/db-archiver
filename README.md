@@ -52,24 +52,25 @@ INFO[0000] Starting worker
 
 
 ## Parameter References
-| Parameter             | Description              | Default | example                 | required   |
-|-----------------------|--------------------------|---------|-------------------------|------------|
-| sourceHost            | source host              |         |                         | true       |
-| sourcePort            | source port              | 3306    | 3306                    | true |
-| sourceUser            | source user              |         |                         | true|
-| sourcePass            | source password          |         |                         | true                    |
-| sourceDB              | source database          |         |                         | true                    |
-| sourceTable           | source table             |         |                         | true                    |
-| sourceQuery           | source query             |         |                         | true                    |
-| sourceWhereCondition  | source where condition   |         |                         | false                   |
-| sourceSplitKey        | source split key         | no      | "id"                    | true       |
-| databendDSN           | databend dsn             | no      | "http://localhost:8000" | true       |
-| databendTable         | databend table           | no      | "db1.tbl"               | true       |
-| batchSize             | batch size               | 1000    | 1000                    | false      |
-| batchMaxInterval      | batch max interval       | 30      | 30                      | false      |
-| copyPurge             | copy purge               | false   | false                   | false      |
-| copyForce             | copy force               | false   | false                   | false      |
-| DisableVariantCheck   | disable variant check    | false   | false                   | false      |
-| userStage             | user external stage name | ~       | ~                       | false      |
+| Parameter             | Description              | Default | example                 | required |
+|-----------------------|--------------------------|---------|-------------------------|----------|
+| sourceHost            | source host              |         |                         | true     |
+| sourcePort            | source port              | 3306    | 3306                    | true     |
+| sourceUser            | source user              |         |                         | true     |
+| sourcePass            | source password          |         |                         | true     |
+| sourceDB              | source database          |         |                         | true     |
+| sourceTable           | source table             |         |                         | true     |
+| sourceQuery           | source query             |         |                         | true     |
+| sourceWhereCondition  | source where condition   |         |                         | false    |
+| sourceSplitKey        | source split key         | no      | "id"                    | false    |
+| sourceSplitTimeKey    | source split time key    | no      | "t1"                    | false    |
+| databendDSN           | databend dsn             | no      | "http://localhost:8000" | true     |
+| databendTable         | databend table           | no      | "db1.tbl"               | true     |
+| batchSize             | batch size               | 1000    | 1000                    | false    |
+| copyPurge             | copy purge               | false   | false                   | false    |
+| copyForce             | copy force               | false   | false                   | false    |
+| DisableVariantCheck   | disable variant check    | false   | false                   | false    |
+| userStage             | user external stage name | ~       | ~                       | false    |
 
 NOTE: To reduce the server load, we set the `sourceSplitKey` which is the primary key of the source table. The tool will split the data by the `sourceSplitKey` and sync the data to Databend in parallel.
+The `sourceSplitTimeKey` is used to split the data by the time column. And the `sourceSplitTimeKey` and `sourceSplitKey` must be set at least one.

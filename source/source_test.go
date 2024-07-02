@@ -2,6 +2,7 @@ package source
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/databendcloud/db-archiver/config"
@@ -99,5 +100,81 @@ func TestSplitConditionAccordingMaxGoRoutine(t *testing.T) {
 	conditions = source.SplitConditionAccordingMaxGoRoutine(200, 100, 300)
 	if len(conditions) != 0 {
 		t.Errorf("Expected 0 conditions, got %d", len(conditions))
+	}
+}
+
+func TestSplitConditionAccordingToTimeSplitKey(t *testing.T) {
+	cfg := &config.Config{
+		SourceSplitTimeKey: "t1",
+	}
+	source, _ := NewMockSource(cfg)
+
+	// Test when minTimeSplitKey is less than maxTimeSplitKey
+	conditions, err := source.SplitConditionAccordingToTimeSplitKey("2024-06-30 2:00:00", "2024-06-30 20:00:00")
+	fmt.Println(conditions)
+	if err != nil {
+		t.Errorf("SplitConditionAccordingToTimeSplitKey() error = %v", err)
+	}
+	if len(conditions) != 19 {
+		t.Errorf("Expected 108 conditions, got %d", len(conditions))
+	}
+
+	// Test when minTimeSplitKey is equal to maxTimeSplitKey
+	conditions, err = source.SplitConditionAccordingToTimeSplitKey("2024-06-30 2:00:00", "2024-06-30 2:00:00")
+	if err != nil {
+		t.Errorf("SplitConditionAccordingToTimeSplitKey() error = %v", err)
+	}
+	if len(conditions) != 1 {
+		t.Errorf("Expected 1 conditions, got %d", len(conditions))
+	}
+
+	// Test when minTimeSplitKey is greater than maxTimeSplitKey
+	conditions, err = source.SplitConditionAccordingToTimeSplitKey("2024-06-30 20:00:00", "2024-06-30 2:00:00")
+	if err != nil {
+		t.Errorf("SplitConditionAccordingToTimeSplitKey() error = %v", err)
+	}
+	if len(conditions) != 0 {
+		t.Errorf("Expected 0 conditions, got %d", len(conditions))
+	}
+}
+
+func TestSplitConditionsByMaxThread(t *testing.T) {
+	cfg := &config.Config{
+		SourceSplitTimeKey: "t1",
+	}
+	source, _ := NewMockSource(cfg)
+	tests := []struct {
+		name       string
+		conditions []string
+		maxThread  int
+		want       [][]string
+	}{
+		{
+			name:       "split into 2 groups",
+			conditions: []string{"a", "b", "c", "d", "e"},
+			maxThread:  2,
+			want:       [][]string{{"a", "b", "c"}, {"d", "e"}},
+		},
+		{
+			name:       "split into 3 groups",
+			conditions: []string{"a", "b", "c", "d", "e", "f"},
+			maxThread:  2,
+			want:       [][]string{{"a", "b", "c"}, {"d", "e", "f"}},
+		},
+		{
+			name:       "all in one group",
+			conditions: []string{"a", "b", "c", "d"},
+			maxThread:  5,
+			want:       [][]string{{"a", "b", "c", "d"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := source.SplitTimeConditionsByMaxThread(tt.conditions, tt.maxThread)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("SplitConditionsByMaxThread() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

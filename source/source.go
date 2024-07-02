@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
@@ -78,7 +79,7 @@ func (s *Source) GetRows(conditionSql string) (*sql.Rows, error) {
 	return rows, nil
 }
 
-func (s *Source) GerMinMaxSplitKey() (int, int, error) {
+func (s *Source) GetMinMaxSplitKey() (int, int, error) {
 	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitKey,
 		s.cfg.SourceSplitKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
 	if err != nil {
@@ -91,6 +92,24 @@ func (s *Source) GerMinMaxSplitKey() (int, int, error) {
 		err = rows.Scan(&minSplitKey, &maxSplitKey)
 		if err != nil {
 			return 0, 0, err
+		}
+	}
+	return minSplitKey, maxSplitKey, nil
+}
+
+func (s *Source) GetMinMaxTimeSplitKey() (string, string, error) {
+	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitTimeKey,
+		s.cfg.SourceSplitTimeKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
+	if err != nil {
+		return "", "", err
+	}
+	defer rows.Close()
+
+	var minSplitKey, maxSplitKey string
+	for rows.Next() {
+		err = rows.Scan(&minSplitKey, &maxSplitKey)
+		if err != nil {
+			return "", "", err
 		}
 	}
 	return minSplitKey, maxSplitKey, nil
@@ -222,6 +241,57 @@ func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, a
 		minSplitKey += s.cfg.BatchSize - 1
 	}
 	return conditions
+}
+
+func (s *Source) SplitTimeConditionsByMaxThread(conditions []string, maxThread int) [][]string {
+	// If maxThread is greater than the length of conditions, return conditions as a single group
+	if maxThread >= len(conditions) {
+		return [][]string{conditions}
+	}
+	var splitConditions [][]string
+	chunkSize := (len(conditions) + maxThread - 1) / maxThread
+	for i := 0; i < len(conditions); i += chunkSize {
+		end := i + chunkSize
+		if end > len(conditions) {
+			end = len(conditions)
+		}
+		splitConditions = append(splitConditions, conditions[i:end])
+	}
+	return splitConditions
+}
+
+func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeSplitKey string) ([]string, error) {
+	var conditions []string
+
+	// Parse the time strings
+	minTime, err := time.Parse("2006-01-02 15:04:05", minTimeSplitKey)
+	if err != nil {
+		return nil, err
+	}
+
+	maxTime, err := time.Parse("2006-01-02 15:04:05", maxTimeSplitKey)
+	if err != nil {
+		return nil, err
+	}
+	if minTime.After(maxTime) {
+		return conditions, nil
+	}
+
+	// Iterate over the time range by 1 hour
+	for {
+		if minTime.After(maxTime) {
+			conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s <= '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, maxTime.Format("2006-01-02 15:04:05")))
+			break
+		}
+		if minTime.Equal(maxTime) {
+			conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s <= '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, maxTime.Format("2006-01-02 15:04:05")))
+			break
+		}
+		conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s < '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, minTime.Add(1*time.Hour).Format("2006-01-02 15:04:05")))
+		minTime = minTime.Add(1 * time.Hour)
+	}
+
+	return conditions, nil
 }
 
 func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, error) {
