@@ -21,7 +21,8 @@ type Config struct {
 	SourceWhereCondition string `json:"sourceWhereCondition"` //example: where id > 100 and id < 200 and time > '2023-01-01'
 	SourceSplitKey       string `json:"sourceSplitKey"`       // primary split key for split table, only for int type
 	// the format of time field must be: 2006-01-02 15:04:05
-	SourceSplitTimeKey string `json:"SourceSplitTimeKey"` // time field for split table
+	SourceSplitTimeKey string `json:"SourceSplitTimeKey"`           // time field for split table
+	TimeSplitUnit      string `json:"TimeSplitUnit" default:"hour"` // time split unit, default is hour, option is: minute, hour, day
 
 	// Databend configuration
 	DatabendDSN      string `json:"databendDSN" default:"localhost:8000"`
@@ -70,8 +71,8 @@ func preCheckConfig(cfg *Config) {
 		}
 	}
 	if cfg.SourceSplitTimeKey != "" {
-		// time warehouse condition must be  x < time < y
-		err := validateSourceSplitTimeKey(cfg.SourceSplitTimeKey)
+		// time warehouse condition must be  x < time and y > time
+		err := validateSourceSplitTimeKey(cfg.SourceWhereCondition)
 		if err != nil {
 			panic(err)
 		}

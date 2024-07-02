@@ -98,8 +98,8 @@ func (s *Source) GetMinMaxSplitKey() (int, int, error) {
 }
 
 func (s *Source) GetMinMaxTimeSplitKey() (string, string, error) {
-	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitKey,
-		s.cfg.SourceSplitKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
+	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitTimeKey,
+		s.cfg.SourceSplitTimeKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
 	if err != nil {
 		return "", "", err
 	}
@@ -243,6 +243,23 @@ func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, a
 	return conditions
 }
 
+func (s *Source) SplitTimeConditionsByMaxThread(conditions []string, maxThread int) [][]string {
+	// If maxThread is greater than the length of conditions, return conditions as a single group
+	if maxThread >= len(conditions) {
+		return [][]string{conditions}
+	}
+	var splitConditions [][]string
+	chunkSize := (len(conditions) + maxThread - 1) / maxThread
+	for i := 0; i < len(conditions); i += chunkSize {
+		end := i + chunkSize
+		if end > len(conditions) {
+			end = len(conditions)
+		}
+		splitConditions = append(splitConditions, conditions[i:end])
+	}
+	return splitConditions
+}
+
 func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeSplitKey string) ([]string, error) {
 	var conditions []string
 
@@ -256,17 +273,22 @@ func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeS
 	if err != nil {
 		return nil, err
 	}
+	if minTime.After(maxTime) {
+		return conditions, nil
+	}
 
-	// Iterate over the time range by 10 minutes
-	for t := minTime; t.Before(maxTime); t = t.Add(10 * time.Minute) {
-		nextDay := t.Add(24 * time.Hour)
-		if nextDay.After(maxTime) {
-			nextDay = maxTime
+	// Iterate over the time range by 1 hour
+	for {
+		if minTime.After(maxTime) {
+			conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s <= '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, maxTime.Format("2006-01-02 15:04:05")))
+			break
 		}
-
-		// Construct the condition
-		condition := fmt.Sprintf("(%s >= '%s' and %s < '%s')", s.cfg.SourceSplitTimeKey, t.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, nextDay.Format("2006-01-02 15:04:05"))
-		conditions = append(conditions, condition)
+		if minTime.Equal(maxTime) {
+			conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s <= '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, maxTime.Format("2006-01-02 15:04:05")))
+			break
+		}
+		conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s < '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, minTime.Add(1*time.Hour).Format("2006-01-02 15:04:05")))
+		minTime = minTime.Add(1 * time.Hour)
 	}
 
 	return conditions, nil
