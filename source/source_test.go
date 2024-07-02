@@ -106,6 +106,7 @@ func TestSplitConditionAccordingMaxGoRoutine(t *testing.T) {
 func TestSplitConditionAccordingToTimeSplitKey(t *testing.T) {
 	cfg := &config.Config{
 		SourceSplitTimeKey: "t1",
+		TimeSplitUnit:      "hour",
 	}
 	source, _ := NewMockSource(cfg)
 
