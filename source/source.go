@@ -287,8 +287,8 @@ func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeS
 			conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s <= '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, maxTime.Format("2006-01-02 15:04:05")))
 			break
 		}
-		conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s < '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, minTime.Add(1*time.Hour).Format("2006-01-02 15:04:05")))
-		minTime = minTime.Add(1 * time.Hour)
+		conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s < '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, minTime.Add(s.cfg.GetTimeRangeBySplitUnit()).Format("2006-01-02 15:04:05")))
+		minTime = minTime.Add(s.cfg.GetTimeRangeBySplitUnit())
 	}
 
 	return conditions, nil

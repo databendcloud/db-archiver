@@ -5,9 +5,30 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"time"
 
 	"github.com/pkg/errors"
 )
+
+type TimeSplitUnit int
+
+const (
+	Minute TimeSplitUnit = iota
+	Hour
+	Day
+)
+
+var TimeSplitUnitToString = map[TimeSplitUnit]string{
+	Minute: "minute",
+	Hour:   "hour",
+	Day:    "day",
+}
+
+var StringToTimeSplitUnit = map[string]TimeSplitUnit{
+	"minute": Minute,
+	"hour":   Hour,
+	"day":    Day,
+}
 
 type Config struct {
 	// Source configuration
@@ -77,6 +98,12 @@ func preCheckConfig(cfg *Config) {
 			panic(err)
 		}
 	}
+	if cfg.SourceSplitTimeKey != "" {
+		err := checkTimeSplitUnit(cfg.TimeSplitUnit)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 func validateSourceSplitTimeKey(value string) error {
@@ -90,4 +117,25 @@ func validateSourceSplitTimeKey(value string) error {
 		return errors.New("SourceSplitTimeKey does not match the required format")
 	}
 	return nil
+}
+
+func checkTimeSplitUnit(unit string) error {
+	_, ok := StringToTimeSplitUnit[unit]
+	if !ok {
+		return fmt.Errorf("invalid TimeSplitUnit: %s, it should be 'minute', 'hour' or 'day'", unit)
+	}
+	return nil
+}
+
+func (c *Config) GetTimeRangeBySplitUnit() time.Duration {
+	switch StringToTimeSplitUnit[c.TimeSplitUnit] {
+	case Minute:
+		return 10 * time.Minute
+	case Hour:
+		return 1 * time.Hour
+	case Day:
+		return 24 * time.Hour
+	default:
+		return 0
+	}
 }
