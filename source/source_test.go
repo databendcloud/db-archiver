@@ -117,7 +117,7 @@ func TestSplitConditionAccordingToTimeSplitKey(t *testing.T) {
 		t.Errorf("SplitConditionAccordingToTimeSplitKey() error = %v", err)
 	}
 	if len(conditions) != 19 {
-		t.Errorf("Expected 108 conditions, got %d", len(conditions))
+		t.Errorf("Expected 19 conditions, got %d", len(conditions))
 	}
 
 	// Test when minTimeSplitKey is equal to maxTimeSplitKey
