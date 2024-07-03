@@ -76,11 +76,15 @@ func TestSplitConditionAccordingMaxGoRoutine(t *testing.T) {
 		BatchSize:      10,
 	}
 	source, _ := NewMockSource(cfg)
+	conditions := source.SplitConditionAccordingMaxGoRoutine(0, 100, 100)
+	if len(conditions) != 12 {
+		t.Errorf("Expected 12 conditions, got %d", len(conditions))
+	}
 
 	// Test when minSplitKey is less than maxSplitKey and maxSplitKey is less than allMax
-	conditions := source.SplitConditionAccordingMaxGoRoutine(0, 50, 100)
-	if len(conditions) != 7 {
-		t.Errorf("Expected 7 conditions, got %d", len(conditions))
+	conditions = source.SplitConditionAccordingMaxGoRoutine(0, 50, 100)
+	if len(conditions) != 6 {
+		t.Errorf("Expected 6 conditions, got %d", len(conditions))
 	}
 	if conditions[4] != fmt.Sprintf("(%s >= %d and %s < %d)", cfg.SourceSplitKey, 36, cfg.SourceSplitKey, 45) {
 		t.Errorf("Expected last condition to be (%s >= %d and %s < %d), got %s", cfg.SourceSplitKey, 36, cfg.SourceSplitKey, 45, conditions[4])

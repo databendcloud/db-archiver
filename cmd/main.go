@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"sync"
@@ -17,6 +19,9 @@ import (
 )
 
 func main() {
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
 	start := fmt.Sprintf("start time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(start)
 	startTime := time.Now()

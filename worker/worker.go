@@ -29,25 +29,19 @@ func NewWorker(cfg *config.Config, name string, ig ingester.DatabendIngester, sr
 }
 
 func (w *Worker) stepBatchWithCondition(conditionSql string) error {
-	execSql := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", w.cfg.SourceDB,
-		w.cfg.SourceTable, conditionSql)
-	if w.cfg.SourceWhereCondition != "" {
-		execSql = fmt.Sprintf("%s AND %s", execSql, w.cfg.SourceWhereCondition)
-	}
-	rows, err := w.src.GetRows(execSql)
-	if err != nil {
-		return err
-	}
-
-	data, columns, err := w.src.QueryTableData(rows)
+	data, columns, err := w.src.QueryTableData(conditionSql)
 	if err != nil {
 		return err
 	}
 	if len(data) == 0 {
 		return nil
 	}
-	err = w.ig.IngestData(columns, data)
+	err = w.ig.DoRetry(
+		func() error {
+			return w.ig.IngestData(columns, data)
+		})
 	if err != nil {
+		logrus.Errorf("Failed to ingest data between %s into Databend: %v", conditionSql, err)
 		return err
 	}
 
@@ -142,7 +136,6 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 		}(i)
 	}
 	wg.Wait()
-	return nil
 
 	return nil
 }

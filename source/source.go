@@ -71,12 +71,16 @@ func (s *Source) GetBatchNum(rows *sql.Rows) (int, int) {
 	return batchNum, count
 }
 
-func (s *Source) GetRows(conditionSql string) (*sql.Rows, error) {
-	rows, err := s.db.Query(conditionSql)
+func (s *Source) GetRowsCountByConditionSql(conditionSql string) (int, error) {
+	rowCountQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s WHERE %s", s.cfg.SourceDB, s.cfg.SourceTable, conditionSql)
+	row := s.db.QueryRow(rowCountQuery)
+	var rowCount int
+	err := row.Scan(&rowCount)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return rows, nil
+
+	return rowCount, nil
 }
 
 func (s *Source) GetMinMaxSplitKey() (int, int, error) {
@@ -144,7 +148,16 @@ func (s *Source) DeleteAfterSync() error {
 	return nil
 }
 
-func (s *Source) QueryTableData(rows *sql.Rows) ([][]interface{}, []string, error) {
+func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string, error) {
+	execSql := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", s.cfg.SourceDB,
+		s.cfg.SourceTable, conditionSql)
+	if s.cfg.SourceWhereCondition != "" {
+		execSql = fmt.Sprintf("%s AND %s", execSql, s.cfg.SourceWhereCondition)
+	}
+	rows, err := s.db.Query(execSql)
+	if err != nil {
+		return nil, nil, err
+	}
 	defer rows.Close()
 	columns, err := rows.Columns()
 	if err != nil {
@@ -177,6 +190,11 @@ func (s *Source) QueryTableData(rows *sql.Rows) ([][]interface{}, []string, erro
 	}
 
 	var result [][]interface{}
+	//rowCount, err := s.GetRowsCountByConditionSql(conditionSql)
+	//if err != nil {
+	//	return nil, nil, err
+	//}
+	//result := make([][]interface{}, rowCount)
 	for rows.Next() {
 		err = rows.Scan(scanArgs...)
 		if err != nil {
@@ -226,7 +244,7 @@ func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, a
 	}
 
 	for {
-		if minSplitKey >= maxSplitKey {
+		if (minSplitKey + s.cfg.BatchSize - 1) >= maxSplitKey {
 			if minSplitKey > allMax {
 				return conditions
 			}
@@ -236,6 +254,10 @@ func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, a
 				conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey))
 			}
 			break
+		}
+		if (minSplitKey + s.cfg.BatchSize - 1) >= allMax {
+			conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, allMax))
+			return conditions
 		}
 		conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, minSplitKey+s.cfg.BatchSize-1))
 		minSplitKey += s.cfg.BatchSize - 1
@@ -299,6 +321,9 @@ func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, erro
 	var batchJsonData []string
 
 	for _, row := range data {
+		if len(row) == 0 {
+			continue
+		}
 		rowMap := make(map[string]interface{})
 		for i, column := range columns {
 			rowMap[column] = row[i]

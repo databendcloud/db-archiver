@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/avast/retry-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -33,6 +34,7 @@ type DatabendIngester interface {
 	IngestData(columns []string, batchJsonData [][]interface{}) error
 	uploadToStage(fileName string) (*godatabend.StageLocation, error)
 	GetAllSyncedCount() (int, error)
+	DoRetry(f retry.RetryableFunc) error
 }
 
 func NewDatabendIngester(cfg *config.Config) DatabendIngester {
@@ -156,4 +158,26 @@ func execute(db *sql.DB, sql string) error {
 		return err
 	}
 	return nil
+}
+
+func (ig *databendIngester) DoRetry(f retry.RetryableFunc) error {
+	delay := time.Second
+	maxDelay := 30 * time.Minute
+	return retry.Do(
+		func() error {
+			return f()
+		},
+		retry.RetryIf(func(err error) bool {
+			if err == nil {
+				return false
+			}
+			if errors.Is(err, ErrUploadStageFailed) || errors.Is(err, ErrCopyIntoFailed) {
+				return true
+			}
+			return false
+		}),
+		retry.Delay(delay),
+		retry.MaxDelay(maxDelay),
+		retry.DelayType(retry.BackOffDelay),
+	)
 }

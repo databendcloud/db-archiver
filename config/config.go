@@ -13,21 +13,24 @@ import (
 type TimeSplitUnit int
 
 const (
-	Minute TimeSplitUnit = iota
+	Minute  TimeSplitUnit = iota
+	Quarter               // 15 minutes
 	Hour
 	Day
 )
 
 var TimeSplitUnitToString = map[TimeSplitUnit]string{
-	Minute: "minute",
-	Hour:   "hour",
-	Day:    "day",
+	Minute:  "minute",
+	Quarter: "quarter",
+	Hour:    "hour",
+	Day:     "day",
 }
 
 var StringToTimeSplitUnit = map[string]TimeSplitUnit{
-	"minute": Minute,
-	"hour":   Hour,
-	"day":    Day,
+	"minute":  Minute,
+	"quarter": Quarter,
+	"hour":    Hour,
+	"day":     Day,
 }
 
 type Config struct {
@@ -122,7 +125,7 @@ func validateSourceSplitTimeKey(value string) error {
 func checkTimeSplitUnit(unit string) error {
 	_, ok := StringToTimeSplitUnit[unit]
 	if !ok {
-		return fmt.Errorf("invalid TimeSplitUnit: %s, it should be 'minute', 'hour' or 'day'", unit)
+		return fmt.Errorf("invalid TimeSplitUnit: %s, it should be 'minute', 'quarter', 'hour', or 'day'", unit)
 	}
 	return nil
 }
@@ -131,6 +134,8 @@ func (c *Config) GetTimeRangeBySplitUnit() time.Duration {
 	switch StringToTimeSplitUnit[c.TimeSplitUnit] {
 	case Minute:
 		return 10 * time.Minute
+	case Quarter:
+		return 15 * time.Minute
 	case Hour:
 		return 1 * time.Hour
 	case Day:
