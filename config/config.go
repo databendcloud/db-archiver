@@ -137,7 +137,7 @@ func (c *Config) GetTimeRangeBySplitUnit() time.Duration {
 	case Quarter:
 		return 15 * time.Minute
 	case Hour:
-		return 1 * time.Hour
+		return 2 * time.Hour
 	case Day:
 		return 24 * time.Hour
 	default:

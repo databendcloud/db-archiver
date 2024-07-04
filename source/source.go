@@ -151,7 +151,7 @@ func (s *Source) DeleteAfterSync() error {
 func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string, error) {
 	execSql := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", s.cfg.SourceDB,
 		s.cfg.SourceTable, conditionSql)
-	if s.cfg.SourceWhereCondition != "" {
+	if s.cfg.SourceWhereCondition != "" && s.cfg.SourceSplitKey != "" {
 		execSql = fmt.Sprintf("%s AND %s", execSql, s.cfg.SourceWhereCondition)
 	}
 	rows, err := s.db.Query(execSql)
