@@ -69,7 +69,7 @@ func (w *Worker) stepBatch() error {
 			go func(idx int) {
 				defer wg.Done()
 				conditions := w.src.SplitConditionAccordingMaxGoRoutine(slimedRange[idx][0], slimedRange[idx][1], maxSplitKey)
-				logrus.Infof("conditions in one routine: %v", conditions)
+				logrus.Infof("conditions in one routine: %v", len(conditions))
 				if err != nil {
 					logrus.Errorf("stepBatchWithCondition failed: %v", err)
 				}
@@ -113,6 +113,7 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("allConditions: ", len(allConditions))
 	fmt.Println("all split conditions", allConditions)
 	slimedRange := w.src.SplitTimeConditionsByMaxThread(allConditions, w.cfg.MaxThread)
 	fmt.Println(len(slimedRange))
@@ -122,7 +123,8 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 		go func(idx int) {
 			defer wg.Done()
 			conditions := slimedRange[idx]
-			logrus.Infof("conditions in one routine: %v", conditions)
+			//logrus.Infof("conditions in one routine: %v", conditions)
+			logrus.Infof("conditions in one routine: %d", len(conditions))
 			if err != nil {
 				logrus.Errorf("stepBatchWithCondition failed: %v", err)
 			}

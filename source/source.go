@@ -299,7 +299,7 @@ func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeS
 		return conditions, nil
 	}
 
-	// Iterate over the time range by 1 hour
+	// Iterate over the time range
 	for {
 		if minTime.After(maxTime) {
 			conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s <= '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, maxTime.Format("2006-01-02 15:04:05")))
