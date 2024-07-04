@@ -29,22 +29,19 @@ func NewWorker(cfg *config.Config, name string, ig ingester.DatabendIngester, sr
 }
 
 func (w *Worker) stepBatchWithCondition(conditionSql string) error {
-	execSql := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", w.cfg.SourceDB,
-		w.cfg.SourceTable, conditionSql)
-	if w.cfg.SourceWhereCondition != "" {
-		execSql = fmt.Sprintf("%s AND %s", execSql, w.cfg.SourceWhereCondition)
-	}
-	rows, err := w.src.GetRows(execSql)
+	data, columns, err := w.src.QueryTableData(conditionSql)
 	if err != nil {
 		return err
 	}
-
-	data, columns, err := w.src.QueryTableData(rows)
-	if err != nil {
-		return err
+	if len(data) == 0 {
+		return nil
 	}
-	err = w.ig.IngestData(columns, data)
+	err = w.ig.DoRetry(
+		func() error {
+			return w.ig.IngestData(columns, data)
+		})
 	if err != nil {
+		logrus.Errorf("Failed to ingest data between %s into Databend: %v", conditionSql, err)
 		return err
 	}
 
@@ -57,7 +54,7 @@ func (w *Worker) IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, batchSiz
 
 func (w *Worker) stepBatch() error {
 	wg := &sync.WaitGroup{}
-	minSplitKey, maxSplitKey, err := w.src.GerMinMaxSplitKey()
+	minSplitKey, maxSplitKey, err := w.src.GetMinMaxSplitKey()
 	if err != nil {
 		return err
 	}
@@ -72,7 +69,7 @@ func (w *Worker) stepBatch() error {
 			go func(idx int) {
 				defer wg.Done()
 				conditions := w.src.SplitConditionAccordingMaxGoRoutine(slimedRange[idx][0], slimedRange[idx][1], maxSplitKey)
-				logrus.Infof("conditions in one routine: %v", conditions)
+				logrus.Infof("conditions in one routine: %v", len(conditions))
 				if err != nil {
 					logrus.Errorf("stepBatchWithCondition failed: %v", err)
 				}
@@ -103,6 +100,48 @@ func (w *Worker) stepBatch() error {
 	return nil
 }
 
+func (w *Worker) StepBatchByTimeSplitKey() error {
+	wg := &sync.WaitGroup{}
+	minSplitKey, maxSplitKey, err := w.src.GetMinMaxTimeSplitKey()
+	if err != nil {
+		return err
+	}
+	fmt.Println("minSplitKey", minSplitKey, "maxSplitKey", maxSplitKey)
+
+	fmt.Println("split according time split key", w.cfg.MaxThread)
+	allConditions, err := w.src.SplitConditionAccordingToTimeSplitKey(minSplitKey, maxSplitKey)
+	if err != nil {
+		return err
+	}
+	fmt.Println("allConditions: ", len(allConditions))
+	fmt.Println("all split conditions", allConditions)
+	slimedRange := w.src.SplitTimeConditionsByMaxThread(allConditions, w.cfg.MaxThread)
+	fmt.Println(len(slimedRange))
+	fmt.Println("slimedRange", slimedRange)
+	wg.Add(w.cfg.MaxThread)
+	for i := 0; i < w.cfg.MaxThread; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			conditions := slimedRange[idx]
+			//logrus.Infof("conditions in one routine: %v", conditions)
+			logrus.Infof("conditions in one routine: %d", len(conditions))
+			if err != nil {
+				logrus.Errorf("stepBatchWithCondition failed: %v", err)
+			}
+			for _, condition := range conditions {
+				logrus.Infof("condition: %s", condition)
+				err := w.stepBatchWithCondition(condition)
+				if err != nil {
+					logrus.Errorf("stepBatchWithCondition failed: %v", err)
+				}
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	return nil
+}
+
 func (w *Worker) IsWorkerCorrect() bool {
 	syncedCount, err := w.ig.GetAllSyncedCount()
 	if err != nil {
@@ -117,7 +156,17 @@ func (w *Worker) IsWorkerCorrect() bool {
 
 func (w *Worker) Run(ctx context.Context) {
 	logrus.Printf("Starting worker %s", w.name)
-	w.stepBatch()
+	if w.cfg.SourceSplitTimeKey != "" {
+		err := w.StepBatchByTimeSplitKey()
+		if err != nil {
+			logrus.Errorf("StepBatchByTimeSplitKey failed: %v", err)
+		}
+	} else {
+		err := w.stepBatch()
+		if err != nil {
+			logrus.Errorf("stepBatch failed: %v", err)
+		}
+	}
 
 	if w.cfg.DeleteAfterSync {
 		err := w.src.DeleteAfterSync()

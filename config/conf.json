@@ -4,12 +4,14 @@
   "sourceUser": "root",
   "sourcePass": "123456",
   "sourceDB": "mydb",
-  "sourceTable": "my_table",
-  "sourceQuery": "select * from mydb.my_table",
-  "sourceWhereCondition": "id < 100",
-  "sourceSplitKey": "id",
+  "sourceTable": "my_table2",
+  "sourceQuery": "select * from mydb.my_table2",
+  "sourceWhereCondition": "t1 >= '2024-06-01' and t1 < '2024-07-01'",
+  "sourceSplitKey": "",
+  "sourceSplitTimeKey": "t1",
+  "timeSplitUnit": "minute",
   "databendDSN": "https://cloudapp:password@tn3ftqihs--medium-p8at.gw.aws-us-east-2.default.databend.com:443",
-  "databendTable": "testSync.my_table",
+  "databendTable": "testSync.my_table2",
   "batchSize": 2,
   "batchMaxInterval": 30,
   "copyPurge": false,
@@ -17,5 +19,5 @@
   "disableVariantCheck": false,
   "userStage": "~",
   "deleteAfterSync": false,
-  "maxThread": 2
+  "maxThread": 10
 }

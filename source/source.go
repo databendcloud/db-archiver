@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
@@ -40,45 +41,31 @@ func NewSource(cfg *config.Config) (*Source, error) {
 	}, nil
 }
 
-func getRowCount(rows *sql.Rows) int {
-	var count = 0
-	for rows.Next() {
-		count++
-	}
-	return count
-}
-
 func (s *Source) GetSourceReadRowsCount() (int, error) {
-	rows, err := s.db.Query(fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", s.cfg.SourceDB,
+	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", s.cfg.SourceDB,
 		s.cfg.SourceTable, s.cfg.SourceWhereCondition))
+	var rowCount int
+	err := row.Scan(&rowCount)
 	if err != nil {
 		return 0, err
 	}
 
-	defer rows.Close()
-
-	return getRowCount(rows), nil
+	return rowCount, nil
 }
 
-// GetBatchNum returns the number of batches to be processed
-func (s *Source) GetBatchNum(rows *sql.Rows) (int, int) {
-	count := getRowCount(rows)
-	batchNum := count / s.cfg.BatchSize
-	if count%s.cfg.BatchSize != 0 {
-		batchNum++
-	}
-	return batchNum, count
-}
-
-func (s *Source) GetRows(conditionSql string) (*sql.Rows, error) {
-	rows, err := s.db.Query(conditionSql)
+func (s *Source) GetRowsCountByConditionSql(conditionSql string) (int, error) {
+	rowCountQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s WHERE %s", s.cfg.SourceDB, s.cfg.SourceTable, conditionSql)
+	row := s.db.QueryRow(rowCountQuery)
+	var rowCount int
+	err := row.Scan(&rowCount)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return rows, nil
+
+	return rowCount, nil
 }
 
-func (s *Source) GerMinMaxSplitKey() (int, int, error) {
+func (s *Source) GetMinMaxSplitKey() (int, int, error) {
 	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitKey,
 		s.cfg.SourceSplitKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
 	if err != nil {
@@ -91,6 +78,24 @@ func (s *Source) GerMinMaxSplitKey() (int, int, error) {
 		err = rows.Scan(&minSplitKey, &maxSplitKey)
 		if err != nil {
 			return 0, 0, err
+		}
+	}
+	return minSplitKey, maxSplitKey, nil
+}
+
+func (s *Source) GetMinMaxTimeSplitKey() (string, string, error) {
+	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitTimeKey,
+		s.cfg.SourceSplitTimeKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
+	if err != nil {
+		return "", "", err
+	}
+	defer rows.Close()
+
+	var minSplitKey, maxSplitKey string
+	for rows.Next() {
+		err = rows.Scan(&minSplitKey, &maxSplitKey)
+		if err != nil {
+			return "", "", err
 		}
 	}
 	return minSplitKey, maxSplitKey, nil
@@ -125,7 +130,16 @@ func (s *Source) DeleteAfterSync() error {
 	return nil
 }
 
-func (s *Source) QueryTableData(rows *sql.Rows) ([][]interface{}, []string, error) {
+func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string, error) {
+	execSql := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", s.cfg.SourceDB,
+		s.cfg.SourceTable, conditionSql)
+	if s.cfg.SourceWhereCondition != "" && s.cfg.SourceSplitKey != "" {
+		execSql = fmt.Sprintf("%s AND %s", execSql, s.cfg.SourceWhereCondition)
+	}
+	rows, err := s.db.Query(execSql)
+	if err != nil {
+		return nil, nil, err
+	}
 	defer rows.Close()
 	columns, err := rows.Columns()
 	if err != nil {
@@ -158,6 +172,11 @@ func (s *Source) QueryTableData(rows *sql.Rows) ([][]interface{}, []string, erro
 	}
 
 	var result [][]interface{}
+	//rowCount, err := s.GetRowsCountByConditionSql(conditionSql)
+	//if err != nil {
+	//	return nil, nil, err
+	//}
+	//result := make([][]interface{}, rowCount)
 	for rows.Next() {
 		err = rows.Scan(scanArgs...)
 		if err != nil {
@@ -207,7 +226,7 @@ func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, a
 	}
 
 	for {
-		if minSplitKey >= maxSplitKey {
+		if (minSplitKey + s.cfg.BatchSize - 1) >= maxSplitKey {
 			if minSplitKey > allMax {
 				return conditions
 			}
@@ -218,10 +237,65 @@ func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, a
 			}
 			break
 		}
+		if (minSplitKey + s.cfg.BatchSize - 1) >= allMax {
+			conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, allMax))
+			return conditions
+		}
 		conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, minSplitKey+s.cfg.BatchSize-1))
 		minSplitKey += s.cfg.BatchSize - 1
 	}
 	return conditions
+}
+
+func (s *Source) SplitTimeConditionsByMaxThread(conditions []string, maxThread int) [][]string {
+	// If maxThread is greater than the length of conditions, return conditions as a single group
+	if maxThread >= len(conditions) {
+		return [][]string{conditions}
+	}
+	var splitConditions [][]string
+	chunkSize := (len(conditions) + maxThread - 1) / maxThread
+	for i := 0; i < len(conditions); i += chunkSize {
+		end := i + chunkSize
+		if end > len(conditions) {
+			end = len(conditions)
+		}
+		splitConditions = append(splitConditions, conditions[i:end])
+	}
+	return splitConditions
+}
+
+func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeSplitKey string) ([]string, error) {
+	var conditions []string
+
+	// Parse the time strings
+	minTime, err := time.Parse("2006-01-02 15:04:05", minTimeSplitKey)
+	if err != nil {
+		return nil, err
+	}
+
+	maxTime, err := time.Parse("2006-01-02 15:04:05", maxTimeSplitKey)
+	if err != nil {
+		return nil, err
+	}
+	if minTime.After(maxTime) {
+		return conditions, nil
+	}
+
+	// Iterate over the time range
+	for {
+		if minTime.After(maxTime) {
+			conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s <= '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, maxTime.Format("2006-01-02 15:04:05")))
+			break
+		}
+		if minTime.Equal(maxTime) {
+			conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s <= '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, maxTime.Format("2006-01-02 15:04:05")))
+			break
+		}
+		conditions = append(conditions, fmt.Sprintf("(%s >= '%s' and %s < '%s')", s.cfg.SourceSplitTimeKey, minTime.Format("2006-01-02 15:04:05"), s.cfg.SourceSplitTimeKey, minTime.Add(s.cfg.GetTimeRangeBySplitUnit()).Format("2006-01-02 15:04:05")))
+		minTime = minTime.Add(s.cfg.GetTimeRangeBySplitUnit())
+	}
+
+	return conditions, nil
 }
 
 func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, error) {
@@ -229,6 +303,9 @@ func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, erro
 	var batchJsonData []string
 
 	for _, row := range data {
+		if len(row) == 0 {
+			continue
+		}
 		rowMap := make(map[string]interface{})
 		for i, column := range columns {
 			rowMap[column] = row[i]
