@@ -41,34 +41,16 @@ func NewSource(cfg *config.Config) (*Source, error) {
 	}, nil
 }
 
-func getRowCount(rows *sql.Rows) int {
-	var count = 0
-	for rows.Next() {
-		count++
-	}
-	return count
-}
-
 func (s *Source) GetSourceReadRowsCount() (int, error) {
-	rows, err := s.db.Query(fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", s.cfg.SourceDB,
+	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", s.cfg.SourceDB,
 		s.cfg.SourceTable, s.cfg.SourceWhereCondition))
+	var rowCount int
+	err := row.Scan(&rowCount)
 	if err != nil {
 		return 0, err
 	}
 
-	defer rows.Close()
-
-	return getRowCount(rows), nil
-}
-
-// GetBatchNum returns the number of batches to be processed
-func (s *Source) GetBatchNum(rows *sql.Rows) (int, int) {
-	count := getRowCount(rows)
-	batchNum := count / s.cfg.BatchSize
-	if count%s.cfg.BatchSize != 0 {
-		batchNum++
-	}
-	return batchNum, count
+	return rowCount, nil
 }
 
 func (s *Source) GetRowsCountByConditionSql(conditionSql string) (int, error) {
