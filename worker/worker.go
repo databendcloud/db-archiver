@@ -130,7 +130,7 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 			}
 			for _, condition := range conditions {
 				logrus.Infof("condition: %s", condition)
-				err := w.stepBatchWithCondition(condition)
+				err := w.stepBatchWithTimeCondition(condition, w.cfg.BatchSize)
 				if err != nil {
 					logrus.Errorf("stepBatchWithCondition failed: %v", err)
 				}
@@ -139,6 +139,30 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 	}
 	wg.Wait()
 
+	return nil
+}
+
+func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int) error {
+	offset := 0
+	for {
+		batchSql := fmt.Sprintf("%s LIMIT %d OFFSET %d", conditionSql, batchSize, offset)
+		data, columns, err := w.src.QueryTableData(batchSql)
+		if err != nil {
+			return err
+		}
+		if len(data) == 0 {
+			break
+		}
+		err = w.ig.DoRetry(
+			func() error {
+				return w.ig.IngestData(columns, data)
+			})
+		if err != nil {
+			logrus.Errorf("Failed to ingest data between %s into Databend: %v", conditionSql, err)
+			return err
+		}
+		offset += batchSize
+	}
 	return nil
 }
 
