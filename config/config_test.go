@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 )
 
 func TestValidateSourceSplitTimeKey(t *testing.T) {
@@ -58,6 +59,45 @@ func TestValidateSourceSplitTimeKey(t *testing.T) {
 			err := validateSourceSplitTimeKey(tt.value)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateSourceSplitTimeKey() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetTimeRangeBySplitUnit(t *testing.T) {
+	tests := []struct {
+		name     string
+		unit     string
+		expected time.Duration
+	}{
+		{
+			name:     "Minute unit returns 10 minutes",
+			unit:     "minute",
+			expected: 10 * time.Minute,
+		},
+		{
+			name:     "Quarter unit returns 15 minutes",
+			unit:     "quarter",
+			expected: 15 * time.Minute,
+		},
+		{
+			name:     "Hour unit returns 2 hours",
+			unit:     "hour",
+			expected: 2 * time.Hour,
+		},
+		{
+			name:     "Day unit returns 24 hours",
+			unit:     "day",
+			expected: 24 * time.Hour,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{TimeSplitUnit: tt.unit}
+			got := cfg.GetTimeRangeBySplitUnit()
+			if got != tt.expected {
+				t.Errorf("GetTimeRangeBySplitUnit() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
