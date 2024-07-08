@@ -123,7 +123,6 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 		go func(idx int) {
 			defer wg.Done()
 			conditions := slimedRange[idx]
-			//logrus.Infof("conditions in one routine: %v", conditions)
 			logrus.Infof("conditions in one routine: %d", len(conditions))
 			if err != nil {
 				logrus.Errorf("stepBatchWithCondition failed: %v", err)
