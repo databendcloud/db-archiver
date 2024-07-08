@@ -20,9 +20,7 @@ type Source struct {
 }
 
 type Sourcer interface {
-	QueryTableData(rows *sql.Rows) ([][]interface{}, []string, error)
-	GetBatchNum(rows *sql.Rows) (int, int)
-	GetRows(conditionSql string) (*sql.Rows, error)
+	QueryTableData(conditionSql string) ([][]interface{}, []string, error)
 }
 
 func NewSource(cfg *config.Config) (*Source, error) {
