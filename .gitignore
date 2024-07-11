@@ -23,4 +23,5 @@ front/dist
 front/dist-ssr
 front/*.local
 front/src/.umi
+front/src/.umi-production
 front/yarn-error.log
