@@ -9,9 +9,9 @@ const Footer: React.FC = () => {
       }}
       links={[
         {
-          key: '© Databend',
-          title: '© Databend',
-          href: 'https://github.com/datafuselabs/databend',
+          key: 'Databend',
+          title: `© ${new Date().getFullYear()} Databend Cloud. All Rights Reserved.`,
+          href: 'https://www.databend.com/',
           blankTarget: true,
         },
       ]}

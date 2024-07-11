@@ -21,7 +21,7 @@ export const Question = () => {
         height: 26,
       }}
       onClick={() => {
-        window.open('https://docs.databend.com/guides');
+        window.open('https://github.com/databendcloud/db-archiver');
       }}
     >
       <QuestionCircleOutlined />
