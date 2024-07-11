@@ -22,4 +22,5 @@ front/.DS_Store
 front/dist
 front/dist-ssr
 front/*.local
+front/src/.umi
 front/yarn-error.log
