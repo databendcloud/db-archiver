@@ -178,6 +178,13 @@ func (w *Worker) IsWorkerCorrect() (int, int, bool) {
 }
 
 func (w *Worker) Run(ctx context.Context) {
+	logrus.Printf("Worker %s checking before start", w.name)
+	syncedCount, err := w.ig.GetAllSyncedCount()
+	if err != nil || syncedCount != 0 {
+		logrus.Errorf("pre-check failed: %v", err)
+		return
+	}
+
 	logrus.Printf("Starting worker %s", w.name)
 	if w.cfg.SourceSplitTimeKey != "" {
 		err := w.StepBatchByTimeSplitKey()
