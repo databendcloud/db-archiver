@@ -165,16 +165,16 @@ func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int) 
 	return nil
 }
 
-func (w *Worker) IsWorkerCorrect() bool {
+func (w *Worker) IsWorkerCorrect() (int, int, bool) {
 	syncedCount, err := w.ig.GetAllSyncedCount()
 	if err != nil {
-		return false
+		return 0, 0, false
 	}
 	sourceCount, err := w.src.GetSourceReadRowsCount()
 	if err != nil {
-		return false
+		return 0, 0, false
 	}
-	return syncedCount == sourceCount
+	return syncedCount, sourceCount, syncedCount == sourceCount
 }
 
 func (w *Worker) Run(ctx context.Context) {
@@ -191,16 +191,20 @@ func (w *Worker) Run(ctx context.Context) {
 		}
 	}
 
-	if w.cfg.DeleteAfterSync {
+	sourceCount, targetCount, workerCorrect := w.IsWorkerCorrect()
+
+	if workerCorrect {
+		logrus.Infof("Worker %s finished and data correct, source data count is %d,"+
+			" target data count is %d", w.name, sourceCount, targetCount)
+	} else {
+		logrus.Errorf("Worker %s finished and data incorrect, source data count is %d,"+
+			" but databend data count is %d", w.name, sourceCount, targetCount)
+	}
+
+	if w.cfg.DeleteAfterSync && workerCorrect {
 		err := w.src.DeleteAfterSync()
 		if err != nil {
 			logrus.Errorf("DeleteAfterSync failed: %v, please do it mannually", err)
 		}
 	}
-	syncedCount, err := w.ig.GetAllSyncedCount()
-	if err != nil {
-		logrus.Errorf("GetAllSyncedCount failed: %v", err)
-	}
-
-	fmt.Println("all syncedCount is:", syncedCount)
 }
