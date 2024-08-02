@@ -154,6 +154,8 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 		switch columnType.DatabaseTypeName() {
 		case "INT", "SMALLINT", "TINYINT", "MEDIUMINT", "BIGINT":
 			scanArgs[i] = new(int)
+		case "UNSIGNED INT", "UNSIGNED TINYINT", "UNSIGNED MEDIUMINT", "UNSIGNED BIGINT":
+			scanArgs[i] = new(sql.NullInt64)
 		case "FLOAT", "DOUBLE":
 			scanArgs[i] = new(float64)
 		case "DECIMAL":
@@ -189,6 +191,20 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 			case *string:
 				row[i] = *v
 			case *bool:
+				row[i] = *v
+			case *sql.NullInt64:
+				if v.Valid {
+					row[i] = v.Int64
+				} else {
+					row[i] = nil
+				}
+			case *sql.NullFloat64:
+				if v.Valid {
+					row[i] = v.Float64
+				} else {
+					row[i] = nil
+				}
+			case *float64:
 				row[i] = *v
 			case *sql.RawBytes:
 				row[i] = string(*v)
