@@ -10,7 +10,7 @@
   "sourceSplitKey": "id",
   "sourceSplitTimeKey": "",
   "timeSplitUnit": "minute",
-  "databendDSN": "https://databend:databend@localhost:8000",
+  "databendDSN": "http://databend:databend@localhost:8000",
   "databendTable": "testSync.t1",
   "batchSize": 2,
   "batchMaxInterval": 30,
