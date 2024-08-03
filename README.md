@@ -133,3 +133,6 @@ The example of the `conf.json`:
   "deleteAfterSync": false,
   "maxThread": 10
 ```
+
+
+NOTE: The `mysql-go` will handle the bool type as TINYINT(1). So you need to use `TINYINT` in databend to store the bool type.
