@@ -65,6 +65,7 @@ func prepareMysql() {
 			timestamp_col TIMESTAMP
 		)
 	`)
+	// need to test the TIME type in mysql
 	if err != nil {
 		log.Fatal(err)
 	}
