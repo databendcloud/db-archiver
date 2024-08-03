@@ -44,8 +44,8 @@ func prepareMysql() {
 	for i := 1; i <= 10; i++ {
 		_, err = db.Exec(`
 			INSERT INTO test_table 
-			(id, int_col, varchar_col, float_col, bool_col, date_col, time_col, datetime_col, timestamp_col) 
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(id, int_col, varchar_col, float_col, de, bool_col, date_col, time_col, datetime_col, timestamp_col) 
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, i, i, fmt.Sprintf("varchar %d", i), float64(i), i%2 == 0, 1.1, "2022-01-01", "00:00:00", "2022-01-01 00:00:00", "2022-01-01 00:00:00")
 		if err != nil {
 			log.Fatal(err)
