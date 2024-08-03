@@ -63,7 +63,7 @@ func prepareDatabend() {
 	// Create table
 	_, err = db.Exec(`
 		CREATE TABLE test_table (
-			id BIGINT UNSIGNED PRIMARY KEY,
+			id UINT64,
 			int_col INT,
 			varchar_col VARCHAR(255),
 			float_col FLOAT,
