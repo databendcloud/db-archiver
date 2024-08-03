@@ -60,7 +60,7 @@ func prepareMysql() {
 			bool_col BOOL,
 			de decimal(18,6),
 			date_col DATE,
-			time_col TIME,
+			time_col TIMESTAMP,
 			datetime_col DATETIME,
 			timestamp_col TIMESTAMP
 		)
