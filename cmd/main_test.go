@@ -76,7 +76,7 @@ func prepareMysql() {
 			INSERT INTO test_table 
 			(id, int_col, varchar_col, float_col, de, bool_col, date_col, time_col, datetime_col, timestamp_col) 
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, i, i, fmt.Sprintf("varchar %d", i), float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", "2022-01-01 00:00:00", "2022-01-01 00:00:00")
+		`, i, i, fmt.Sprintf("varchar %d", i), float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", "2022-01-01 00:00:00", "2024-06-30 20:00:00")
 		if err != nil {
 			log.Fatal(err)
 		}
