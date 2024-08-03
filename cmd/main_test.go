@@ -60,7 +60,6 @@ func prepareMysql() {
 			bool_col BOOL,
 			de decimal(18,6),
 			date_col DATE,
-			time_col TIMESTAMP,
 			datetime_col DATETIME,
 			timestamp_col TIMESTAMP
 		)
@@ -74,9 +73,9 @@ func prepareMysql() {
 	for i := 1; i <= 10; i++ {
 		_, err = db.Exec(`
 			INSERT INTO test_table 
-			(id, int_col, varchar_col, float_col, de, bool_col, date_col, time_col, datetime_col, timestamp_col) 
+			(id, int_col, varchar_col, float_col, de, bool_col, date_col,  datetime_col, timestamp_col) 
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, i, i, fmt.Sprintf("varchar %d", i), float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", "2022-01-01 00:00:00", "2024-06-30 20:00:00")
+		`, i, i, fmt.Sprintf("varchar %d", i), float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", "2024-06-30 20:00:00")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -100,7 +99,6 @@ func prepareDatabend() {
 			bool_col TINYINT,
 			de decimal(18,6),
 			date_col DATE,
-			time_col TIMESTAMP,
 			datetime_col TIMESTAMP,
 			timestamp_col TIMESTAMP
 		)
@@ -161,10 +159,9 @@ func checkTargetTable() {
 		var bool_col bool
 		var de float64
 		var date_col string
-		var time_col string
 		var datetime_col string
 		var timestamp_col string
-		err = rows.Scan(&id, &int_col, &varchar_col, &float_col, &bool_col, &de, &date_col, &time_col, &datetime_col, &timestamp_col)
+		err = rows.Scan(&id, &int_col, &varchar_col, &float_col, &bool_col, &de, &date_col, &datetime_col, &timestamp_col)
 		if err != nil {
 			log.Fatal(err)
 		}
