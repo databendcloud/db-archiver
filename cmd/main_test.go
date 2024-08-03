@@ -96,7 +96,7 @@ func prepareDatabend() {
 			int_col INT,
 			varchar_col VARCHAR(255),
 			float_col FLOAT,
-			bool_col BOOL,
+			bool_col TINYINT,
 			de decimal(18,6),
 			date_col DATE,
 			time_col DATETIME,
