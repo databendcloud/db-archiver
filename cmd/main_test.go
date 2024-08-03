@@ -40,6 +40,7 @@ func TestWorkFlow(t *testing.T) {
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
 
+	checkTargetTable()
 }
 
 func prepareMysql() {
@@ -133,4 +134,49 @@ func prepareTestConfig() *cfg.Config {
 	}
 
 	return &config
+}
+
+func checkTargetTable() {
+	db, err := sql.Open("databend", "http://databend:databend@localhost:8000")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	rows, err := db.Query(`
+		SELECT * FROM default.test_table
+	`)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+	count := 0
+
+	for rows.Next() {
+		var id int
+		var int_col int
+		var varchar_col string
+		var float_col float64
+		var bool_col bool
+		var de float64
+		var date_col string
+		var time_col string
+		var datetime_col string
+		var timestamp_col string
+		err = rows.Scan(&id, &int_col, &varchar_col, &float_col, &bool_col, &de, &date_col, &time_col, &datetime_col, &timestamp_col)
+		if err != nil {
+			log.Fatal(err)
+		}
+		count += 1
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+	defer db.Close()
+	fmt.Println("target table count: ", count)
+	if count != 10 {
+		panic("target table count not equal 10")
+	}
 }
