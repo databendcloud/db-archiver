@@ -4,17 +4,18 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-func main() {
+func TestWorkFlow(t *testing.T) {
 	prepareMysql()
 	prepareDatabend()
 }
 
 func prepareMysql() {
-	db, err := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/dbname")
+	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/default")
 	if err != nil {
 		log.Fatal(err)
 	}
