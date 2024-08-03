@@ -1,17 +1,45 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
+	"sync"
 	"testing"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+
+	cfg "github.com/databendcloud/db-archiver/config"
+	"github.com/databendcloud/db-archiver/ingester"
+	"github.com/databendcloud/db-archiver/source"
+	"github.com/databendcloud/db-archiver/worker"
 )
 
 func TestWorkFlow(t *testing.T) {
 	prepareMysql()
 	prepareDatabend()
+	testConfig := prepareTestConfig()
+	startTime := time.Now()
+
+	ig := ingester.NewDatabendIngester(testConfig)
+	src, err := source.NewSource(testConfig)
+	if err != nil {
+		panic(err)
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	w := worker.NewWorker(testConfig, fmt.Sprintf("worker"), ig, src)
+	go func() {
+		w.Run(context.TODO())
+		wg.Done()
+	}()
+	wg.Wait()
+	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Println(endTime)
+	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
+
 }
 
 func prepareMysql() {
@@ -78,4 +106,31 @@ func prepareDatabend() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func prepareTestConfig() *cfg.Config {
+	config := cfg.Config{
+		SourceDB:             "default",
+		SourceHost:           "127.0.0.1",
+		SourcePort:           3306,
+		SourceUser:           "root",
+		SourcePass:           "123456",
+		SourceTable:          "test_table",
+		SourceWhereCondition: "id > 0",
+		SourceQuery:          "select * from default.test_table",
+		SourceSplitKey:       "id",
+		SourceSplitTimeKey:   "",
+		DatabendDSN:          "http://databend:databend@localhost:8000",
+		DatabendTable:        "default.test_table",
+		BatchSize:            5,
+		BatchMaxInterval:     3,
+		MaxThread:            2,
+		CopyForce:            false,
+		CopyPurge:            false,
+		DeleteAfterSync:      false,
+		DisableVariantCheck:  false,
+		UserStage:            "~",
+	}
+
+	return &config
 }
