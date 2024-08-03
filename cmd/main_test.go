@@ -99,8 +99,8 @@ func prepareDatabend() {
 			bool_col TINYINT,
 			de decimal(18,6),
 			date_col DATE,
-			time_col DATETIME,
-			datetime_col DATETIME,
+			time_col TIMESTAMP,
+			datetime_col TIMESTAMP,
 			timestamp_col TIMESTAMP
 		)
 	`)
