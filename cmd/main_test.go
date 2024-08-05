@@ -80,6 +80,26 @@ func prepareMysql() {
 			log.Fatal(err)
 		}
 	}
+
+	for i := 1; i <= 10; i++ {
+		var intCol sql.NullInt64
+		var varcharCol sql.NullString
+		if i%2 == 0 { // 假设我们只为偶数行设置非空值
+			intCol = sql.NullInt64{Int64: int64(i), Valid: true}
+			varcharCol = sql.NullString{String: fmt.Sprintf("varchar %d", i), Valid: true}
+		} else {
+			intCol = sql.NullInt64{Valid: false}
+			varcharCol = sql.NullString{Valid: false}
+		}
+		_, err = db.Exec(`
+		INSERT INTO test_table 
+		(id, int_col, varchar_col, float_col, de, bool_col, date_col,  datetime_col, timestamp_col) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, i, intCol, varcharCol, float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", "2024-06-30 20:00:00")
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }
 
 func prepareDatabend() {
@@ -174,7 +194,7 @@ func checkTargetTable() {
 	defer rows.Close()
 	defer db.Close()
 	fmt.Println("target table count: ", count)
-	if count != 10 {
+	if count != 20 {
 		panic("target table count not equal 10")
 	}
 }
