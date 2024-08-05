@@ -15,6 +15,8 @@ import (
 	"github.com/databendcloud/db-archiver/ingester"
 	"github.com/databendcloud/db-archiver/source"
 	"github.com/databendcloud/db-archiver/worker"
+
+	_ "github.com/datafuselabs/databend-go"
 )
 
 func TestWorkFlow(t *testing.T) {
@@ -169,7 +171,7 @@ func checkTargetTable() {
 	count := 0
 
 	for rows.Next() {
-		var id int
+		var id interface{}
 		var int_col int
 		var varchar_col string
 		var float_col float64
@@ -180,13 +182,13 @@ func checkTargetTable() {
 		var timestamp_col string
 		err = rows.Scan(&id, &int_col, &varchar_col, &float_col, &bool_col, &de, &date_col, &datetime_col, &timestamp_col)
 		if err != nil {
+			log.Println("#################")
 			log.Fatal(err)
 		}
 		count += 1
 	}
 
 	if err := rows.Err(); err != nil {
-		log.Println("#################")
 		log.Fatal(err)
 	}
 	defer rows.Close()
