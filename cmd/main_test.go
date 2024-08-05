@@ -186,6 +186,7 @@ func checkTargetTable() {
 	}
 
 	if err := rows.Err(); err != nil {
+		log.Println("#################")
 		log.Fatal(err)
 	}
 	defer rows.Close()
