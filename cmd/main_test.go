@@ -171,8 +171,8 @@ func checkTargetTable() {
 	count := 0
 
 	for rows.Next() {
-		var id interface{}
-		var int_col int
+		var id int
+		var int_col interface{}
 		var varchar_col string
 		var float_col float64
 		var bool_col bool
