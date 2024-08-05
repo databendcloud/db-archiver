@@ -153,15 +153,15 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 	for i, columnType := range columnTypes {
 		switch columnType.DatabaseTypeName() {
 		case "INT", "SMALLINT", "TINYINT", "MEDIUMINT", "BIGINT":
-			scanArgs[i] = new(int)
+			scanArgs[i] = new(sql.NullInt64)
 		case "UNSIGNED INT", "UNSIGNED TINYINT", "UNSIGNED MEDIUMINT", "UNSIGNED BIGINT":
 			scanArgs[i] = new(sql.NullInt64)
 		case "FLOAT", "DOUBLE":
-			scanArgs[i] = new(float64)
+			scanArgs[i] = new(sql.NullFloat64)
 		case "DECIMAL":
 			scanArgs[i] = new(sql.NullFloat64)
 		case "CHAR", "VARCHAR", "TEXT", "TINYTEXT", "MEDIUMTEXT", "LONGTEXT":
-			scanArgs[i] = new(string)
+			scanArgs[i] = new(sql.NullString)
 		case "DATE", "TIME", "DATETIME", "TIMESTAMP":
 			scanArgs[i] = new(string) // or use time.Time
 		case "BOOL", "BOOLEAN":
@@ -190,6 +190,12 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 				row[i] = *v
 			case *string:
 				row[i] = *v
+			case *sql.NullString:
+				if v.Valid {
+					row[i] = v.String
+				} else {
+					row[i] = nil
+				}
 			case *bool:
 				row[i] = *v
 			case *sql.NullInt64:
