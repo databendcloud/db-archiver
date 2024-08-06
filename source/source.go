@@ -32,6 +32,7 @@ func NewSource(cfg *config.Config) (*Source, error) {
 		cfg.SourcePort,
 		cfg.SourceDB))
 	if err != nil {
+		logrus.Errorf("failed to open db: %v", err)
 		return nil, err
 	}
 	return &Source{
