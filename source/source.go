@@ -25,12 +25,11 @@ type Sourcer interface {
 }
 
 func NewSource(cfg *config.Config) (*Source, error) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/mysql",
 		cfg.SourceUser,
 		cfg.SourcePass,
 		cfg.SourceHost,
-		cfg.SourcePort,
-		cfg.SourceDB))
+		cfg.SourcePort))
 	if err != nil {
 		logrus.Errorf("failed to open db: %v", err)
 		return nil, err
