@@ -1,0 +1,23 @@
+{
+  "sourceHost": "127.0.0.1",
+  "sourcePort": 3306,
+  "sourceUser": "root",
+  "sourcePass": "123456",
+  "sourceDB": "mydb",
+  "sourceTable": "t1",
+  "sourceQuery": "select * from mydb.t1",
+  "sourceWhereCondition": "id > 0",
+  "sourceSplitKey": "id",
+  "sourceSplitTimeKey": "",
+  "timeSplitUnit": "minute",
+  "databendDSN": "http://databend:databend@localhost:8000",
+  "databendTable": "testSync.t1",
+  "batchSize": 2,
+  "batchMaxInterval": 30,
+  "copyPurge": false,
+  "copyForce": false,
+  "disableVariantCheck": false,
+  "userStage": "~",
+  "deleteAfterSync": false,
+  "maxThread": 10
+}

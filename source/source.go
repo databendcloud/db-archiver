@@ -165,7 +165,7 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 		case "DATE", "TIME", "DATETIME", "TIMESTAMP":
 			scanArgs[i] = new(string) // or use time.Time
 		case "BOOL", "BOOLEAN":
-			scanArgs[i] = new(bool)
+			scanArgs[i] = new(sql.NullBool)
 		default:
 			scanArgs[i] = new(sql.RawBytes)
 		}
@@ -207,6 +207,12 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 			case *sql.NullFloat64:
 				if v.Valid {
 					row[i] = v.Float64
+				} else {
+					row[i] = nil
+				}
+			case *sql.NullBool:
+				if v.Valid {
+					row[i] = v.Bool
 				} else {
 					row[i] = nil
 				}
