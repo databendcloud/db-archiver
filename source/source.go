@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"regexp"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -24,12 +25,11 @@ type Sourcer interface {
 }
 
 func NewSource(cfg *config.Config) (*Source, error) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/default",
 		cfg.SourceUser,
 		cfg.SourcePass,
 		cfg.SourceHost,
-		cfg.SourcePort,
-		cfg.SourceDB))
+		cfg.SourcePort))
 	if err != nil {
 		return nil, err
 	}
@@ -322,6 +322,60 @@ func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeS
 	}
 
 	return conditions, nil
+}
+
+func (s *Source) GetDatabasesAccordingToSourceDbRegex() ([]string, error) {
+	rows, err := s.db.Query("SHOW DATABASES")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var databases []string
+	for rows.Next() {
+		var database string
+		err = rows.Scan(&database)
+		if err != nil {
+			return nil, err
+		}
+		match, err := regexp.MatchString(s.cfg.SourceDB, database)
+		if err != nil {
+			return nil, err
+		}
+		if match {
+			databases = append(databases, database)
+		}
+	}
+	return databases, nil
+}
+
+func (s *Source) GetTablesAccordingToSourceTableRegex(databases []string) (map[string][]string, error) {
+	dbTables := make(map[string][]string)
+	for _, database := range databases {
+		rows, err := s.db.Query(fmt.Sprintf("SHOW TABLES FROM %s", database))
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		var tables []string
+		for rows.Next() {
+			var table string
+			err = rows.Scan(&table)
+			if err != nil {
+				return nil, err
+			}
+			match, err := regexp.MatchString(s.cfg.SourceTable, table)
+			if err != nil {
+				return nil, err
+			}
+			if match {
+				tables = append(tables, table)
+			}
+		}
+		dbTables[database] = tables
+	}
+	return dbTables, nil
 }
 
 func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, error) {

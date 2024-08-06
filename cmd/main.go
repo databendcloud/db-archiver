@@ -51,11 +51,23 @@ func main() {
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	w := worker.NewWorker(cfg, fmt.Sprintf("worker"), ig, src)
-	go func() {
-		w.Run(ctx)
-		wg.Done()
-	}()
+	dbs, err := src.GetDatabasesAccordingToSourceDbRegex()
+	if err != nil {
+		panic(err)
+	}
+	dbTables, err := src.GetTablesAccordingToSourceTableRegex(dbs)
+	if err != nil {
+		panic(err)
+	}
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			w := worker.NewWorker(cfg, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
+			go func() {
+				w.Run(ctx)
+				wg.Done()
+			}()
+		}
+	}
 	wg.Wait()
 	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(endTime)
