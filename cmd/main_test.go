@@ -58,11 +58,13 @@ func TestWorkFlow(t *testing.T) {
 }
 
 func prepareMysql() {
-	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/default")
+	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/mysql")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	db.Exec("Create database if not exists mydb")
+	db.Exec("Use mydb")
 
 	// Create table
 	_, err = db.Exec(`
@@ -144,7 +146,7 @@ func prepareDatabend() {
 
 func prepareTestConfig() *cfg.Config {
 	config := cfg.Config{
-		SourceDB:             "default",
+		SourceDB:             "mydb",
 		SourceHost:           "127.0.0.1",
 		SourcePort:           3306,
 		SourceUser:           "root",
