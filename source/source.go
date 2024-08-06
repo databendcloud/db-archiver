@@ -30,7 +30,7 @@ func NewSource(cfg *config.Config) (*Source, error) {
 		cfg.SourcePass,
 		cfg.SourceHost,
 		cfg.SourcePort,
-		"default"))
+		cfg.SourceDB))
 	if err != nil {
 		return nil, err
 	}
