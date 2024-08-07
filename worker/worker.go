@@ -19,7 +19,14 @@ type Worker struct {
 	src  *source.Source
 }
 
-func NewWorker(cfg *config.Config, name string, ig ingester.DatabendIngester, src *source.Source) *Worker {
+func NewWorker(cfg *config.Config, dbName string, tableName string, name string, ig ingester.DatabendIngester, src *source.Source) *Worker {
+	cfg.SourceDB = dbName
+	cfg.SourceTable = tableName
+	cfg.SourceQuery = fmt.Sprintf("select * from %s.%s", cfg.SourceDB, cfg.SourceTable)
+	src, err := source.NewSource(cfg)
+	if err != nil {
+		return nil
+	}
 	return &Worker{
 		name: name,
 		cfg:  cfg,

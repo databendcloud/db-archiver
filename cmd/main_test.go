@@ -32,11 +32,23 @@ func TestWorkFlow(t *testing.T) {
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	w := worker.NewWorker(testConfig, fmt.Sprintf("worker"), ig, src)
-	go func() {
-		w.Run(context.TODO())
-		wg.Done()
-	}()
+	dbs, err := src.GetDatabasesAccordingToSourceDbRegex()
+	if err != nil {
+		panic(err)
+	}
+	dbTables, err := src.GetTablesAccordingToSourceTableRegex(dbs)
+	if err != nil {
+		panic(err)
+	}
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			w := worker.NewWorker(testConfig, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
+			go func() {
+				w.Run(context.Background())
+				wg.Done()
+			}()
+		}
+	}
 	wg.Wait()
 	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(endTime)
@@ -46,11 +58,13 @@ func TestWorkFlow(t *testing.T) {
 }
 
 func prepareMysql() {
-	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/default")
+	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/mysql")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	db.Exec("Create database if not exists mydb")
+	db.Exec("Use mydb")
 
 	// Create table
 	_, err = db.Exec(`
@@ -132,7 +146,7 @@ func prepareDatabend() {
 
 func prepareTestConfig() *cfg.Config {
 	config := cfg.Config{
-		SourceDB:             "default",
+		SourceDB:             "mydb",
 		SourceHost:           "127.0.0.1",
 		SourcePort:           3306,
 		SourceUser:           "root",
