@@ -5,7 +5,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -88,11 +90,13 @@ func (ig *databendIngester) IngestData(columns []string, batchData [][]interface
 		return err
 	}
 
+	copyIntoStartTime := time.Now()
 	err = ig.copyInto(stage)
 	if err != nil {
 		l.Errorf("copy into failed: %v\n", err)
 		return err
 	}
+	l.Infof("copy into cost: %v ms", time.Since(copyIntoStartTime).Milliseconds())
 	ig.statsRecorder.RecordMetric(bytesSize, len(batchData))
 	stats := ig.statsRecorder.Stats(time.Since(startTime))
 	log.Printf("ingest %d rows (%f rows/s), %d bytes (%f bytes/s)", len(batchData), stats.RowsPerSecondd, bytesSize, stats.BytesPerSecond)
@@ -129,11 +133,50 @@ func (ig *databendIngester) uploadToStage(fileName string) (*godatabend.StageLoc
 		Path: fmt.Sprintf("batch/%d-%s", time.Now().Unix(), filepath.Base(fileName)),
 	}
 
-	if err := apiClient.UploadToStage(context.Background(), stage, input, size); err != nil {
+	presignedStartTime := time.Now()
+	presigned, err := apiClient.GetPresignedURL(context.Background(), stage)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get presigned url")
+	}
+	logrus.Infof("get presigned url cost: %v ms", time.Since(presignedStartTime).Milliseconds())
+
+	uploadByPresignedUrl := time.Now()
+	if err := ig.UploadToStageByPresignURL(presigned, input, size); err != nil {
 		return nil, errors.Wrap(ErrUploadStageFailed, err.Error())
 	}
+	logrus.Infof("upload by presigned url cost: %v ms", time.Since(uploadByPresignedUrl).Milliseconds())
 
 	return stage, nil
+}
+
+func (ig *databendIngester) UploadToStageByPresignURL(presignedResp *godatabend.PresignedResponse, input *bufio.Reader, size int64) error {
+	req, err := http.NewRequest("PUT", presignedResp.URL, input)
+	if err != nil {
+		return err
+	}
+	for k, v := range presignedResp.Headers {
+		req.Header.Set(k, v)
+	}
+	req.ContentLength = size
+	// TODO: configurable timeout
+	httpClient := &http.Client{
+		Timeout: time.Second * 120,
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "failed to upload to stage by presigned url")
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= 400 {
+		return errors.Errorf("failed to upload to stage by presigned url, status code: %d, body: %s", resp.StatusCode, string(respBody))
+	}
+	return nil
 }
 
 func (ig *databendIngester) copyInto(stage *godatabend.StageLocation) error {
