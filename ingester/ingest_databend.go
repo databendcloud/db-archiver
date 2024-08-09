@@ -33,7 +33,7 @@ type databendIngester struct {
 }
 
 type DatabendIngester interface {
-	IngestData(columns []string, batchJsonData [][]interface{}) error
+	IngestData(threadNum int, columns []string, batchJsonData [][]interface{}) error
 	uploadToStage(fileName string) (*godatabend.StageLocation, error)
 	GetAllSyncedCount() (int, error)
 	DoRetry(f retry.RetryableFunc) error
@@ -70,7 +70,7 @@ func (ig *databendIngester) GetAllSyncedCount() (int, error) {
 	return 0, nil
 }
 
-func (ig *databendIngester) IngestData(columns []string, batchData [][]interface{}) error {
+func (ig *databendIngester) IngestData(threadNum int, columns []string, batchData [][]interface{}) error {
 	l := logrus.WithFields(logrus.Fields{"ingest_databend": "IngestData"})
 	startTime := time.Now()
 
@@ -96,10 +96,11 @@ func (ig *databendIngester) IngestData(columns []string, batchData [][]interface
 		l.Errorf("copy into failed: %v\n", err)
 		return err
 	}
-	l.Infof("copy into cost: %v ms", time.Since(copyIntoStartTime).Milliseconds())
+	l.Infof("thread-%d: copy into cost: %v ms", threadNum, time.Since(copyIntoStartTime).Milliseconds())
 	ig.statsRecorder.RecordMetric(bytesSize, len(batchData))
 	stats := ig.statsRecorder.Stats(time.Since(startTime))
-	log.Printf("ingest %d rows (%f rows/s), %d bytes (%f bytes/s)", len(batchData), stats.RowsPerSecondd, bytesSize, stats.BytesPerSecond)
+	log.Printf("thread-%d: ingest %d rows (%f rows/s), %d bytes (%f bytes/s)", threadNum,
+		len(batchData), stats.RowsPerSecondd, bytesSize, stats.BytesPerSecond)
 	return nil
 }
 
@@ -185,7 +186,7 @@ func (ig *databendIngester) copyInto(stage *godatabend.StageLocation) error {
 		ig.databendIngesterCfg.CopyPurge, ig.databendIngesterCfg.CopyForce, ig.databendIngesterCfg.DisableVariantCheck)
 	db, err := sql.Open("databend", ig.databendIngesterCfg.DatabendDSN)
 	if err != nil {
-		logrus.Errorf("create db error: %v", err)
+		logrus.Errorf("init db error: %v", err)
 		return err
 	}
 	if err := execute(db, copyIntoSQL); err != nil {

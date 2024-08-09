@@ -2,8 +2,11 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -13,39 +16,63 @@ import (
 )
 
 type Worker struct {
-	name string
-	cfg  *config.Config
-	ig   ingester.DatabendIngester
-	src  *source.Source
+	name          string
+	cfg           *config.Config
+	ig            ingester.DatabendIngester
+	src           *source.Source
+	statsRecorder *DatabendWorkerStatsRecorder
 }
 
+var (
+	AlreadyIngestRows  = 0
+	AlreadyIngestBytes = 0
+)
+
 func NewWorker(cfg *config.Config, name string, ig ingester.DatabendIngester, src *source.Source) *Worker {
+	stats := NewDatabendWorkerStatsRecorder()
 	return &Worker{
-		name: name,
-		cfg:  cfg,
-		ig:   ig,
-		src:  src,
+		name:          name,
+		cfg:           cfg,
+		ig:            ig,
+		src:           src,
+		statsRecorder: stats,
 	}
 }
 
-func (w *Worker) stepBatchWithCondition(conditionSql string) error {
-	data, columns, err := w.src.QueryTableData(conditionSql)
+func (w *Worker) stepBatchWithCondition(threadNum int, conditionSql string) error {
+	data, columns, err := w.src.QueryTableData(threadNum, conditionSql)
 	if err != nil {
 		return err
 	}
 	if len(data) == 0 {
 		return nil
 	}
+	startTime := time.Now()
 	err = w.ig.DoRetry(
 		func() error {
-			return w.ig.IngestData(columns, data)
+			return w.ig.IngestData(threadNum, columns, data)
 		})
+	AlreadyIngestRows += len(data)
+	AlreadyIngestBytes += calculateBytesSize(data)
+	w.statsRecorder.RecordMetric(AlreadyIngestBytes, AlreadyIngestRows)
+	stats := w.statsRecorder.Stats(time.Since(startTime))
+	log.Printf("Globla speed: total ingested %d rows (%f rows/s), %d bytes (%f bytes/s)",
+		AlreadyIngestRows, stats.RowsPerSecondd, AlreadyIngestBytes, stats.BytesPerSecond)
+
 	if err != nil {
 		logrus.Errorf("Failed to ingest data between %s into Databend: %v", conditionSql, err)
 		return err
 	}
 
 	return nil
+}
+
+func calculateBytesSize(batch [][]interface{}) int {
+	bytes, err := json.Marshal(batch)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return len(bytes)
 }
 
 func (w *Worker) IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, batchSize int) bool {
@@ -75,7 +102,7 @@ func (w *Worker) stepBatch() error {
 				}
 				for _, condition := range conditions {
 					logrus.Infof("condition: %s", condition)
-					err := w.stepBatchWithCondition(condition)
+					err := w.stepBatchWithCondition(idx, condition)
 					if err != nil {
 						logrus.Errorf("stepBatchWithCondition failed: %v", err)
 					}
@@ -90,7 +117,7 @@ func (w *Worker) stepBatch() error {
 		wg.Add(1)
 		go func(condition string) {
 			defer wg.Done()
-			err := w.stepBatchWithCondition(condition)
+			err := w.stepBatchWithCondition(1, condition)
 			if err != nil {
 				logrus.Errorf("stepBatchWithCondition failed: %v", err)
 			}
@@ -145,7 +172,7 @@ func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int) 
 	offset := 0
 	for {
 		batchSql := fmt.Sprintf("%s LIMIT %d OFFSET %d", conditionSql, batchSize, offset)
-		data, columns, err := w.src.QueryTableData(batchSql)
+		data, columns, err := w.src.QueryTableData(1, batchSql)
 		if err != nil {
 			return err
 		}
@@ -154,7 +181,7 @@ func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int) 
 		}
 		err = w.ig.DoRetry(
 			func() error {
-				return w.ig.IngestData(columns, data)
+				return w.ig.IngestData(1, columns, data)
 			})
 		if err != nil {
 			logrus.Errorf("Failed to ingest data between %s into Databend: %v", conditionSql, err)
