@@ -168,7 +168,7 @@ func (s *Source) QueryTableData(threadNum int, conditionSql string) ([][]interfa
 		case "CHAR", "VARCHAR", "TEXT", "TINYTEXT", "MEDIUMTEXT", "LONGTEXT":
 			scanArgs[i] = new(sql.NullString)
 		case "DATE", "TIME", "DATETIME", "TIMESTAMP":
-			scanArgs[i] = new(string) // or use time.Time
+			scanArgs[i] = new(sql.NullString) // or use time.Time
 		case "BOOL", "BOOLEAN":
 			scanArgs[i] = new(sql.NullBool)
 		default:
