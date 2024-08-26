@@ -49,16 +49,26 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	dbTables := make(map[string][]string)
+	if len(cfg.SourceDbTables) != 0 {
+		dbTables, err = src.GetDbTablesAccordingToSourceDbTables()
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		dbs, err := src.GetDatabasesAccordingToSourceDbRegex(cfg.SourceDB)
+		if err != nil {
+			panic(err)
+		}
+		dbTables, err = src.GetTablesAccordingToSourceTableRegex(cfg.SourceTable, dbs)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	dbs, err := src.GetDatabasesAccordingToSourceDbRegex()
-	if err != nil {
-		panic(err)
-	}
-	dbTables, err := src.GetTablesAccordingToSourceTableRegex(dbs)
-	if err != nil {
-		panic(err)
-	}
 	for db, tables := range dbTables {
 		for _, table := range tables {
 			w := worker.NewWorker(cfg, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)

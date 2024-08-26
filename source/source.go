@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -333,7 +334,7 @@ func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeS
 	return conditions, nil
 }
 
-func (s *Source) GetDatabasesAccordingToSourceDbRegex() ([]string, error) {
+func (s *Source) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern string) ([]string, error) {
 	rows, err := s.db.Query("SHOW DATABASES")
 	if err != nil {
 		return nil, err
@@ -347,7 +348,7 @@ func (s *Source) GetDatabasesAccordingToSourceDbRegex() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		match, err := regexp.MatchString(s.cfg.SourceDB, database)
+		match, err := regexp.MatchString(sourceDatabasePattern, database)
 		if err != nil {
 			return nil, err
 		}
@@ -358,7 +359,7 @@ func (s *Source) GetDatabasesAccordingToSourceDbRegex() ([]string, error) {
 	return databases, nil
 }
 
-func (s *Source) GetTablesAccordingToSourceTableRegex(databases []string) (map[string][]string, error) {
+func (s *Source) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
 	dbTables := make(map[string][]string)
 	for _, database := range databases {
 		rows, err := s.db.Query(fmt.Sprintf("SHOW TABLES FROM %s", database))
@@ -374,7 +375,7 @@ func (s *Source) GetTablesAccordingToSourceTableRegex(databases []string) (map[s
 			if err != nil {
 				return nil, err
 			}
-			match, err := regexp.MatchString(s.cfg.SourceTable, table)
+			match, err := regexp.MatchString(sourceTablePattern, table)
 			if err != nil {
 				return nil, err
 			}
@@ -385,6 +386,28 @@ func (s *Source) GetTablesAccordingToSourceTableRegex(databases []string) (map[s
 		dbTables[database] = tables
 	}
 	return dbTables, nil
+}
+
+func (s *Source) GetDbTablesAccordingToSourceDbTables() (map[string][]string, error) {
+	allDbTables := make(map[string][]string)
+	for _, sourceDbTable := range s.cfg.SourceDbTables {
+		dbTable := strings.Split(sourceDbTable, ".")
+		if len(dbTable) != 2 {
+			return nil, fmt.Errorf("invalid sourceDbTable: %s, should be a.b format", sourceDbTable)
+		}
+		dbs, err := s.GetDatabasesAccordingToSourceDbRegex(dbTable[0])
+		if err != nil {
+			return nil, fmt.Errorf("get databases according to sourceDbRegex failed: %v", err)
+		}
+		dbTables, err := s.GetTablesAccordingToSourceTableRegex(dbTable[1], dbs)
+		if err != nil {
+			return nil, fmt.Errorf("get tables according to sourceTableRegex failed: %v", err)
+		}
+		for db, tables := range dbTables {
+			allDbTables[db] = append(allDbTables[db], tables...)
+		}
+	}
+	return allDbTables, nil
 }
 
 func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, error) {

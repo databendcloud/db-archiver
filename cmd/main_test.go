@@ -32,11 +32,11 @@ func TestWorkFlow(t *testing.T) {
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	dbs, err := src.GetDatabasesAccordingToSourceDbRegex()
+	dbs, err := src.GetDatabasesAccordingToSourceDbRegex(testConfig.SourceDB)
 	if err != nil {
 		panic(err)
 	}
-	dbTables, err := src.GetTablesAccordingToSourceTableRegex(dbs)
+	dbTables, err := src.GetTablesAccordingToSourceTableRegex(testConfig.SourceTable, dbs)
 	if err != nil {
 		panic(err)
 	}
