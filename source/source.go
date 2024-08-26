@@ -5,7 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"log"
+	"os"
 	"regexp"
 	"time"
 
@@ -16,15 +17,17 @@ import (
 )
 
 type Source struct {
-	db  *sql.DB
-	cfg *config.Config
+	db            *sql.DB
+	cfg           *config.Config
+	statsRecorder *DatabendSourceStatsRecorder
 }
 
 type Sourcer interface {
-	QueryTableData(conditionSql string) ([][]interface{}, []string, error)
+	QueryTableData(threadNum int, conditionSql string) ([][]interface{}, []string, error)
 }
 
 func NewSource(cfg *config.Config) (*Source, error) {
+	stats := NewDatabendIntesterStatsRecorder()
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/mysql",
 		cfg.SourceUser,
 		cfg.SourcePass,
@@ -35,8 +38,9 @@ func NewSource(cfg *config.Config) (*Source, error) {
 		return nil, err
 	}
 	return &Source{
-		db:  db,
-		cfg: cfg,
+		db:            db,
+		cfg:           cfg,
+		statsRecorder: stats,
 	}, nil
 }
 
@@ -129,7 +133,8 @@ func (s *Source) DeleteAfterSync() error {
 	return nil
 }
 
-func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string, error) {
+func (s *Source) QueryTableData(threadNum int, conditionSql string) ([][]interface{}, []string, error) {
+	startTime := time.Now()
 	execSql := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", s.cfg.SourceDB,
 		s.cfg.SourceTable, conditionSql)
 	if s.cfg.SourceWhereCondition != "" && s.cfg.SourceSplitKey != "" {
@@ -164,7 +169,7 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 		case "CHAR", "VARCHAR", "TEXT", "TINYTEXT", "MEDIUMTEXT", "LONGTEXT":
 			scanArgs[i] = new(sql.NullString)
 		case "DATE", "TIME", "DATETIME", "TIMESTAMP":
-			scanArgs[i] = new(string) // or use time.Time
+			scanArgs[i] = new(sql.NullString) // or use time.Time
 		case "BOOL", "BOOLEAN":
 			scanArgs[i] = new(sql.NullBool)
 		default:
@@ -229,6 +234,9 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 	if err = rows.Err(); err != nil {
 		return nil, nil, err
 	}
+	s.statsRecorder.RecordMetric(len(result))
+	stats := s.statsRecorder.Stats(time.Since(startTime))
+	log.Printf("thread-%d: extract %d rows (%f rows/s)", threadNum, len(result), stats.RowsPerSecondd)
 
 	return result, columns, nil
 }
@@ -407,7 +415,8 @@ func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, erro
 }
 
 func generateNDJsonFile(batchJsonData []string) (string, int, error) {
-	outputFile, err := ioutil.TempFile("/tmp", "databend-ingest-*.ndjson")
+	fileName := fmt.Sprintf("databend-ingest-%d.ndjson", time.Now().UnixNano())
+	outputFile, err := os.CreateTemp("/tmp", fileName)
 	if err != nil {
 		return "", 0, err
 	}

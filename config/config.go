@@ -55,9 +55,9 @@ type Config struct {
 	BatchMaxInterval int    `json:"batchMaxInterval" default:"3"` // for rate limit control
 
 	// related docs: https://docs.databend.com/sql/sql-commands/dml/dml-copy-into-table
-	CopyPurge           bool   `json:"copyPurge" default:"false"`
+	CopyPurge           bool   `json:"copyPurge" default:"true"`
 	CopyForce           bool   `json:"copyForce" default:"false"`
-	DisableVariantCheck bool   `json:"disableVariantCheck" default:"false"`
+	DisableVariantCheck bool   `json:"disableVariantCheck" default:"true"`
 	UserStage           string `json:"userStage" default:"~"`
 	DeleteAfterSync     bool   `json:"deleteAfterSync" default:"false"`
 	MaxThread           int    `json:"maxThread" default:"2"`
