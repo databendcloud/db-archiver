@@ -48,6 +48,7 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
+	checkTargetTable()
 }
 
 func TestWorkFlow(t *testing.T) {
@@ -144,9 +145,6 @@ CREATE TABLE db2.test_table2 (
 			log.Fatal(err)
 		}
 	}
-
-	checkTargetTable()
-
 }
 
 func prepareMysql() {
