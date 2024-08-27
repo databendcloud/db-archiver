@@ -66,8 +66,8 @@ func (s *Source) GetAllSourceReadRowsCount() (int, error) {
 }
 
 func (s *Source) GetSourceReadRowsCount(table, db string) (int, error) {
-	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", table,
-		db, s.cfg.SourceWhereCondition))
+	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", db,
+		table, s.cfg.SourceWhereCondition))
 	var rowCount int
 	err := row.Scan(&rowCount)
 	if err != nil {
