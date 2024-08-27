@@ -362,6 +362,7 @@ func (s *Source) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern stri
 func (s *Source) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
 	dbTables := make(map[string][]string)
 	for _, database := range databases {
+		fmt.Println("database: ", database)
 		rows, err := s.db.Query(fmt.Sprintf("SHOW TABLES FROM %s", database))
 		if err != nil {
 			return nil, err
