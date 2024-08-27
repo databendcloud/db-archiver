@@ -45,9 +45,29 @@ func NewSource(cfg *config.Config) (*Source, error) {
 	}, nil
 }
 
-func (s *Source) GetSourceReadRowsCount() (int, error) {
-	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", s.cfg.SourceDB,
-		s.cfg.SourceTable, s.cfg.SourceWhereCondition))
+func (s *Source) GetAllSourceReadRowsCount() (int, error) {
+	allCount := 0
+
+	dbTables, err := s.GetDbTablesAccordingToSourceDbTables()
+	if err != nil {
+		return 0, err
+	}
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			count, err := s.GetSourceReadRowsCount(table, db)
+			if err != nil {
+				return 0, err
+			}
+			allCount += count
+		}
+	}
+
+	return allCount, nil
+}
+
+func (s *Source) GetSourceReadRowsCount(table, db string) (int, error) {
+	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", table,
+		db, s.cfg.SourceWhereCondition))
 	var rowCount int
 	err := row.Scan(&rowCount)
 	if err != nil {

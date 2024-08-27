@@ -205,7 +205,7 @@ func (w *Worker) IsWorkerCorrect() (int, int, bool) {
 	if err != nil {
 		return 0, 0, false
 	}
-	sourceCount, err := w.src.GetSourceReadRowsCount()
+	sourceCount, err := w.src.GetAllSourceReadRowsCount()
 	if err != nil {
 		return 0, 0, false
 	}
@@ -233,7 +233,7 @@ func (w *Worker) Run(ctx context.Context) {
 		}
 	}
 
-	sourceCount, targetCount, workerCorrect := w.IsWorkerCorrect()
+	targetCount, sourceCount, workerCorrect := w.IsWorkerCorrect()
 
 	if workerCorrect {
 		logrus.Infof("Worker %s finished and data correct, source data count is %d,"+
