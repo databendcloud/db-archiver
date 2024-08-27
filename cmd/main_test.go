@@ -158,7 +158,7 @@ func prepareMysql() {
 
 	// Create table
 	_, err = db.Exec(`
-		CREATE TABLE test_table (
+		CREATE TABLE mydb.test_table (
 			id BIGINT UNSIGNED PRIMARY KEY,
 			int_col INT,
 			varchar_col VARCHAR(255),
@@ -178,7 +178,7 @@ func prepareMysql() {
 	// Insert data
 	for i := 1; i <= 10; i++ {
 		_, err = db.Exec(`
-			INSERT INTO test_table 
+			INSERT INTO mydb.test_table 
 			(id, int_col, varchar_col, float_col, de, bool_col, date_col,  datetime_col, timestamp_col) 
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, i, i, fmt.Sprintf("varchar %d", i), float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", "2024-06-30 20:00:00")
@@ -201,7 +201,7 @@ func prepareMysql() {
 			timeCol = sql.NullTime{Valid: false}
 		}
 		_, err = db.Exec(`
-		INSERT INTO test_table 
+		INSERT INTO mydb.test_table 
 		(id, int_col, varchar_col, float_col, de, bool_col, date_col,  datetime_col, timestamp_col) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, i*11, intCol, varcharCol, float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", timeCol)
@@ -220,7 +220,7 @@ func prepareDatabend() {
 
 	// Create table
 	_, err = db.Exec(`
-		CREATE TABLE test_table (
+		CREATE TABLE if not exists test_table (
 			id UINT64,
 			int_col INT,
 			varchar_col VARCHAR(255),
@@ -246,7 +246,7 @@ func prepareTestConfig() *cfg.Config {
 		SourcePass:           "123456",
 		SourceTable:          "test_table",
 		SourceWhereCondition: "id > 0",
-		SourceQuery:          "select * from default.test_table",
+		SourceQuery:          "select * from mydb.test_table",
 		SourceSplitKey:       "id",
 		SourceSplitTimeKey:   "",
 		DatabendDSN:          "http://databend:databend@localhost:8000",

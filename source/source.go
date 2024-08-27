@@ -399,6 +399,7 @@ func (s *Source) GetDbTablesAccordingToSourceDbTables() (map[string][]string, er
 		if err != nil {
 			return nil, fmt.Errorf("get databases according to sourceDbRegex failed: %v", err)
 		}
+		fmt.Println("dbTable-sjh", dbTable)
 		dbTables, err := s.GetTablesAccordingToSourceTableRegex(dbTable[1], dbs)
 		if err != nil {
 			return nil, fmt.Errorf("get tables according to sourceTableRegex failed: %v", err)
