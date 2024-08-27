@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/databendcloud/db-archiver/config"
 	"github.com/databendcloud/db-archiver/ingester"
 	"github.com/databendcloud/db-archiver/source"
@@ -67,11 +69,12 @@ func main() {
 		}
 	}
 
+	w := worker.NewWorker(cfg, "", "", "", ig, src)
 	wg := sync.WaitGroup{}
-	wg.Add(1)
 	for db, tables := range dbTables {
 		for _, table := range tables {
-			w := worker.NewWorker(cfg, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
+			wg.Add(1)
+			w = worker.NewWorker(cfg, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
 			go func() {
 				w.Run(ctx)
 				wg.Done()
@@ -79,6 +82,22 @@ func main() {
 		}
 	}
 	wg.Wait()
+	targetCount, sourceCount, workerCorrect := w.IsWorkerCorrect()
+
+	if workerCorrect {
+		logrus.Infof("Worker %s finished and data correct, source data count is %d,"+
+			" target data count is %d", w.Name, sourceCount, targetCount)
+	} else {
+		logrus.Errorf("Worker %s finished and data incorrect, source data count is %d,"+
+			" but databend data count is %d", w.Name, sourceCount, targetCount)
+	}
+
+	if w.Cfg.DeleteAfterSync && workerCorrect {
+		err := w.Src.DeleteAfterSync()
+		if err != nil {
+			logrus.Errorf("DeleteAfterSync failed: %v, please do it mannually", err)
+		}
+	}
 	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
