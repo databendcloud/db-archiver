@@ -23,7 +23,7 @@ import (
 func TestMultipleDbTablesWorkflow(t *testing.T) {
 
 	prepareDbxTablex()
-	prepareDatabend()
+	prepareDatabend("mydb2")
 
 	testConfig := prepareMultipleConfig()
 	startTime := time.Now()
@@ -48,12 +48,13 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
-	checkTargetTable()
+	err = checkTargetTable()
+	assert.NoError(t, err)
 }
 
 func TestWorkFlow(t *testing.T) {
 	prepareMysql()
-	prepareDatabend()
+	prepareDatabend("mydb")
 	testConfig := prepareTestConfig()
 	startTime := time.Now()
 
@@ -63,7 +64,6 @@ func TestWorkFlow(t *testing.T) {
 		panic(err)
 	}
 	wg := sync.WaitGroup{}
-	wg.Add(1)
 	dbs, err := src.GetDatabasesAccordingToSourceDbRegex(testConfig.SourceDB)
 	if err != nil {
 		panic(err)
@@ -74,6 +74,7 @@ func TestWorkFlow(t *testing.T) {
 	}
 	for db, tables := range dbTables {
 		for _, table := range tables {
+			wg.Add(1)
 			w := worker.NewWorker(testConfig, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
 			go func() {
 				w.Run(context.Background())
@@ -86,7 +87,8 @@ func TestWorkFlow(t *testing.T) {
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
 
-	checkTargetTable()
+	err = checkTargetTable()
+	assert.NoError(t, err)
 }
 
 func prepareDbxTablex() {
@@ -211,7 +213,7 @@ func prepareMysql() {
 	}
 }
 
-func prepareDatabend() {
+func prepareDatabend(dbName string) {
 	db, err := sql.Open("databend", "http://databend:databend@localhost:8000")
 	if err != nil {
 		log.Fatal(err)
@@ -219,19 +221,19 @@ func prepareDatabend() {
 	defer db.Close()
 
 	// Create table
-	_, err = db.Exec(`
-		CREATE TABLE if not exists test_table (
-			id UINT64,
-			int_col INT,
-			varchar_col VARCHAR(255),
-			float_col FLOAT,
-			bool_col TINYINT,
-			de decimal(18,6),
-			date_col DATE,
-			datetime_col TIMESTAMP,
-			timestamp_col TIMESTAMP
-		)
-	`)
+	_, err = db.Exec(fmt.Sprintf(
+		`CREATE TABLE if not exists %s.test_table (
+		id UINT64,
+		int_col INT,
+		varchar_col VARCHAR(255),
+		float_col FLOAT,
+		bool_col TINYINT,
+		de decimal(18,6),
+		date_col DATE,
+		datetime_col TIMESTAMP,
+		timestamp_col TIMESTAMP
+	)
+	`, dbName))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -266,7 +268,7 @@ func prepareTestConfig() *cfg.Config {
 
 func prepareMultipleConfig() *cfg.Config {
 	config := cfg.Config{
-		SourceDB:             "mydb",
+		SourceDB:             "mydb2",
 		SourceHost:           "127.0.0.1",
 		SourcePort:           3306,
 		SourceUser:           "root",
@@ -274,7 +276,7 @@ func prepareMultipleConfig() *cfg.Config {
 		SourceDbTables:       []string{"db.*@test_table.*"},
 		SourceTable:          "test_table",
 		SourceWhereCondition: "id > 0",
-		SourceQuery:          "select * from default.test_table",
+		SourceQuery:          "select * from mydb2.test_table",
 		SourceSplitKey:       "id",
 		SourceSplitTimeKey:   "",
 		DatabendDSN:          "http://databend:databend@localhost:8000",
@@ -292,10 +294,11 @@ func prepareMultipleConfig() *cfg.Config {
 	return &config
 }
 
-func checkTargetTable() {
+func checkTargetTable() error {
 	db, err := sql.Open("databend", "http://databend:databend@localhost:8000")
 	if err != nil {
 		log.Fatal(err)
+		return err
 	}
 	defer db.Close()
 
@@ -304,6 +307,7 @@ func checkTargetTable() {
 	`)
 	if err != nil {
 		log.Fatal(err)
+		return err
 	}
 	defer rows.Close()
 	count := 0
@@ -332,6 +336,7 @@ func checkTargetTable() {
 	defer db.Close()
 	fmt.Println("target table count: ", count)
 	if count != 20 {
-		panic("target table count not equal 10")
+		return fmt.Errorf("target table count not equal 20")
 	}
+	return nil
 }
