@@ -271,7 +271,7 @@ func prepareMultipleConfig() *cfg.Config {
 		SourcePort:           3306,
 		SourceUser:           "root",
 		SourcePass:           "123456",
-		SourceDbTables:       []string{"db*.test_table*"},
+		SourceDbTables:       []string{"db.*@test_table.*"},
 		SourceTable:          "test_table",
 		SourceWhereCondition: "id > 0",
 		SourceQuery:          "select * from default.test_table",

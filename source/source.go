@@ -394,7 +394,7 @@ func (s *Source) GetTablesAccordingToSourceTableRegex(sourceTablePattern string,
 func (s *Source) GetDbTablesAccordingToSourceDbTables() (map[string][]string, error) {
 	allDbTables := make(map[string][]string)
 	for _, sourceDbTable := range s.cfg.SourceDbTables {
-		dbTable := strings.Split(sourceDbTable, ".")
+		dbTable := strings.Split(sourceDbTable, "@") // because `.` in regex is a special character, so use `@` to split
 		if len(dbTable) != 2 {
 			return nil, fmt.Errorf("invalid sourceDbTable: %s, should be a.b format", sourceDbTable)
 		}

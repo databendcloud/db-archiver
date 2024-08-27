@@ -3,7 +3,10 @@ package source
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"testing"
+
+	"github.com/test-go/testify/assert"
 
 	"github.com/databendcloud/db-archiver/config"
 )
@@ -182,4 +185,19 @@ func TestSplitConditionsByMaxThread(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMatchDatabase(t *testing.T) {
+	databasePattern := "db.*"
+	sourceDbs := []string{"db1", "db2", "default"}
+	targetDbs := []string{"db1", "db2"}
+	res := []string{}
+	for _, sourceDb := range sourceDbs {
+		match, err := regexp.MatchString(databasePattern, sourceDb)
+		assert.NoError(t, err)
+		if match {
+			res = append(res, sourceDb)
+		}
+	}
+	assert.Equal(t, targetDbs, res)
 }
