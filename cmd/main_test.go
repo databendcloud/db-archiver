@@ -23,7 +23,7 @@ import (
 func TestMultipleDbTablesWorkflow(t *testing.T) {
 
 	prepareDbxTablex()
-	prepareDatabend("mydb2")
+	prepareDatabend("test_table2")
 
 	testConfig := prepareMultipleConfig()
 	startTime := time.Now()
@@ -48,13 +48,13 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
-	err = checkTargetTable()
+	err = checkTargetTable("test_table2")
 	assert.NoError(t, err)
 }
 
 func TestWorkFlow(t *testing.T) {
 	prepareMysql()
-	prepareDatabend("mydb")
+	prepareDatabend("test_table")
 	testConfig := prepareTestConfig()
 	startTime := time.Now()
 
@@ -87,7 +87,7 @@ func TestWorkFlow(t *testing.T) {
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
 
-	err = checkTargetTable()
+	err = checkTargetTable("test_table")
 	assert.NoError(t, err)
 }
 
@@ -213,7 +213,7 @@ func prepareMysql() {
 	}
 }
 
-func prepareDatabend(dbName string) {
+func prepareDatabend(tableName string) {
 	db, err := sql.Open("databend", "http://databend:databend@localhost:8000")
 	if err != nil {
 		log.Fatal(err)
@@ -222,7 +222,7 @@ func prepareDatabend(dbName string) {
 
 	// Create table
 	_, err = db.Exec(fmt.Sprintf(
-		`CREATE TABLE if not exists %s.test_table (
+		`CREATE TABLE if not exists default.%s (
 		id UINT64,
 		int_col INT,
 		varchar_col VARCHAR(255),
@@ -233,7 +233,7 @@ func prepareDatabend(dbName string) {
 		datetime_col TIMESTAMP,
 		timestamp_col TIMESTAMP
 	)
-	`, dbName))
+	`, tableName))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -268,7 +268,7 @@ func prepareTestConfig() *cfg.Config {
 
 func prepareMultipleConfig() *cfg.Config {
 	config := cfg.Config{
-		SourceDB:             "mydb2",
+		SourceDB:             "mydb",
 		SourceHost:           "127.0.0.1",
 		SourcePort:           3306,
 		SourceUser:           "root",
@@ -280,7 +280,7 @@ func prepareMultipleConfig() *cfg.Config {
 		SourceSplitKey:       "id",
 		SourceSplitTimeKey:   "",
 		DatabendDSN:          "http://databend:databend@localhost:8000",
-		DatabendTable:        "default.test_table",
+		DatabendTable:        "default.test_table2",
 		BatchSize:            5,
 		BatchMaxInterval:     3,
 		MaxThread:            2,
@@ -294,7 +294,7 @@ func prepareMultipleConfig() *cfg.Config {
 	return &config
 }
 
-func checkTargetTable() error {
+func checkTargetTable(tableName string) error {
 	db, err := sql.Open("databend", "http://databend:databend@localhost:8000")
 	if err != nil {
 		log.Fatal(err)
@@ -302,9 +302,7 @@ func checkTargetTable() error {
 	}
 	defer db.Close()
 
-	rows, err := db.Query(`
-		SELECT * FROM default.test_table
-	`)
+	rows, err := db.Query(fmt.Sprintf(`SELECT * FROM default.%s`, tableName))
 	if err != nil {
 		log.Fatal(err)
 		return err
