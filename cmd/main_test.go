@@ -32,11 +32,11 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 	src, err := source.NewSource(testConfig)
 	assert.NoError(t, err)
 	wg := sync.WaitGroup{}
-	wg.Add(1)
 	dbTables, err := src.GetDbTablesAccordingToSourceDbTables()
 	assert.NoError(t, err)
 	for db, tables := range dbTables {
 		for _, table := range tables {
+			wg.Add(1)
 			w := worker.NewWorker(testConfig, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
 			go func() {
 				w.Run(context.Background())
