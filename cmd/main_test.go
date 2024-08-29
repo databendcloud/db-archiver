@@ -28,7 +28,6 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 	testConfig := prepareMultipleConfig()
 	startTime := time.Now()
 
-	ig := ingester.NewDatabendIngester(testConfig)
 	src, err := source.NewSource(testConfig)
 	assert.NoError(t, err)
 	wg := sync.WaitGroup{}
@@ -37,11 +36,19 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 	for db, tables := range dbTables {
 		for _, table := range tables {
 			wg.Add(1)
-			w := worker.NewWorkerForTest(testConfig, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
-			go func() {
+			db := db
+			table := table
+			go func(cfg *cfg.Config, db, table string) {
+				cfgCopy := *testConfig
+				cfgCopy.SourceDB = db
+				cfgCopy.SourceTable = table
+				ig := ingester.NewDatabendIngester(&cfgCopy)
+				src, err := source.NewSource(&cfgCopy)
+				assert.NoError(t, err)
+				w := worker.NewWorkerForTest(&cfgCopy, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
 				w.Run(context.Background())
 				wg.Done()
-			}()
+			}(testConfig, db, table)
 		}
 	}
 	wg.Wait()
