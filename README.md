@@ -18,6 +18,7 @@ Config your database and Databend connection in `config/conf.json`:
   "sourcePass": "123456",
   "sourceDB": "mydb",
   "sourceTable": "my_table",
+  "sourceDbTables": ["mydb.*@table.*"],
   "sourceQuery": "select * from mydb.my_table",
   "sourceWhereCondition": "id < 100",
   "sourceSplitKey": "id",
@@ -52,29 +53,33 @@ INFO[0000] Starting worker
 
 
 ## Parameter References
-| Parameter             | Description              | Default  | example                 | required |
-|-----------------------|--------------------------|----------|-------------------------|----------|
-| sourceHost            | source host              |          |                         | true     |
-| sourcePort            | source port              | 3306     | 3306                    | true     |
-| sourceUser            | source user              |          |                         | true     |
-| sourcePass            | source password          |          |                         | true     |
-| sourceDB              | source database          |          |                         | true     |
-| sourceTable           | source table             |          |                         | true     |
-| sourceQuery           | source query             |          |                         | true     |
-| sourceWhereCondition  | source where condition   |          |                         | false    |
-| sourceSplitKey        | source split key         | no       | "id"                    | false    |
-| sourceSplitTimeKey    | source split time key    | no       | "t1"                    | false    |
-| timeSplitUnit         | time split unit          | "minute" | "day"                   | false    |
-| databendDSN           | databend dsn             | no       | "http://localhost:8000" | true     |
-| databendTable         | databend table           | no       | "db1.tbl"               | true     |
-| batchSize             | batch size               | 1000     | 1000                    | false    |
-| copyPurge             | copy purge               | false    | false                   | false    |
-| copyForce             | copy force               | false    | false                   | false    |
-| DisableVariantCheck   | disable variant check    | false    | false                   | false    |
-| userStage             | user external stage name | ~        | ~                       | false    |
+| Parameter           | Description               | Default  | example                 | required |
+|---------------------|---------------------------|----------|-------------------------|----------|
+| sourceHost          | source host               |          |                         | true     |
+| sourcePort          | source port               | 3306     | 3306                    | true     |
+| sourceUser          | source user               |          |                         | true     |
+| sourcePass          | source password           |          |                         | true     |
+| sourceDB            | source database           |          |                         | true     |
+| sourceTable         | source table              |          |                         | true     |
+| SourceDbTables      | source db tables          | []       | [db.*@table.*,mydb.*.table.*]     | false |
+| sourceQuery         | source query              |          |                         | true     |
+| sourceWhereCondition | source where condition    |          |                         | false    |
+| sourceSplitKey      | source split key          | no       | "id"                    | false    |
+| sourceSplitTimeKey  | source split time key     | no       | "t1"                    | false    |
+| timeSplitUnit       | time split unit           | "minute" | "day"                   | false    |
+| databendDSN         | databend dsn              | no       | "http://localhost:8000" | true     |
+| databendTable       | databend table            | no       | "db1.tbl"               | true     |
+| batchSize           | batch size                | 1000     | 1000                    | false    |
+| copyPurge           | copy purge                | false    | false                   | false    |
+| copyForce           | copy force                | false    | false                   | false    |
+| DisableVariantCheck | disable variant check     | false    | false                   | false    |
+| userStage           | user external stage name  | ~        | ~                       | false    |
 
-NOTE: To reduce the server load, we set the `sourceSplitKey` which is the primary key of the source table. The tool will split the data by the `sourceSplitKey` and sync the data to Databend in parallel.
+NOTE: 1. To reduce the server load, we set the `sourceSplitKey` which is the primary key of the source table. The tool will split the data by the `sourceSplitKey` and sync the data to Databend in parallel.
 The `sourceSplitTimeKey` is used to split the data by the time column. And the `sourceSplitTimeKey` and `sourceSplitKey` must be set at least one.
+2. `sourceDbTables` is used to sync the data from multiple tables. The format is `db.*@table.*` or `db.table.*`. The `.*` is a regex pattern. The `db.*@table.*` means all tables match the regex pattern `table.*` in the database match the regex pattern `db.*`. 
+3. `sourceDbTables` has a higher priority than `sourceTable` and `sourceDB`. If `sourceDbTables` is set, the `sourceTable` will be ignored.
+
 
 ## Two modes
 ### Sync data according to the `sourceSplitKey`

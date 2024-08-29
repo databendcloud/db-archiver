@@ -18,7 +18,7 @@ import (
 type Worker struct {
 	Name          string
 	Cfg           *config.Config
-	ig            ingester.DatabendIngester
+	Ig            ingester.DatabendIngester
 	Src           *source.Source
 	statsRecorder *DatabendWorkerStatsRecorder
 }
@@ -28,7 +28,20 @@ var (
 	AlreadyIngestBytes = 0
 )
 
-func NewWorker(cfg *config.Config, dbName string, tableName string, name string, ig ingester.DatabendIngester, src *source.Source) *Worker {
+func NewWorker(cfg *config.Config, name string, ig ingester.DatabendIngester, src *source.Source) *Worker {
+	stats := NewDatabendWorkerStatsRecorder()
+	cfg.SourceQuery = fmt.Sprintf("select * from %s.%s", cfg.SourceDB, cfg.SourceTable)
+
+	return &Worker{
+		Name:          name,
+		Cfg:           cfg,
+		Ig:            ig,
+		Src:           src,
+		statsRecorder: stats,
+	}
+}
+
+func NewWorkerForTest(cfg *config.Config, dbName string, tableName string, name string, ig ingester.DatabendIngester, src *source.Source) *Worker {
 	stats := NewDatabendWorkerStatsRecorder()
 	cfg.SourceDB = dbName
 	cfg.SourceTable = tableName
@@ -41,7 +54,7 @@ func NewWorker(cfg *config.Config, dbName string, tableName string, name string,
 	return &Worker{
 		Name:          name,
 		Cfg:           cfg,
-		ig:            ig,
+		Ig:            ig,
 		Src:           src,
 		statsRecorder: stats,
 	}
@@ -56,9 +69,9 @@ func (w *Worker) stepBatchWithCondition(threadNum int, conditionSql string) erro
 		return nil
 	}
 	startTime := time.Now()
-	err = w.ig.DoRetry(
+	err = w.Ig.DoRetry(
 		func() error {
-			return w.ig.IngestData(threadNum, columns, data)
+			return w.Ig.IngestData(threadNum, columns, data)
 		})
 	AlreadyIngestRows += len(data)
 	AlreadyIngestBytes += calculateBytesSize(data)
@@ -93,7 +106,7 @@ func (w *Worker) stepBatch() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("minSplitKey", minSplitKey, "maxSplitKey", maxSplitKey)
+	logrus.Infof("db.table is %s.%s, minSplitKey: %d, maxSplitKey : %d", w.Cfg.SourceDB, w.Cfg.SourceTable, minSplitKey, maxSplitKey)
 
 	if w.IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, w.Cfg.BatchSize) {
 		fmt.Println("split according maxGoRoutine", w.Cfg.MaxThread)
@@ -187,9 +200,9 @@ func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int) 
 		if len(data) == 0 {
 			break
 		}
-		err = w.ig.DoRetry(
+		err = w.Ig.DoRetry(
 			func() error {
-				return w.ig.IngestData(1, columns, data)
+				return w.Ig.IngestData(1, columns, data)
 			})
 		if err != nil {
 			logrus.Errorf("Failed to ingest data between %s into Databend: %v", conditionSql, err)
@@ -201,12 +214,14 @@ func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int) 
 }
 
 func (w *Worker) IsWorkerCorrect() (int, int, bool) {
-	syncedCount, err := w.ig.GetAllSyncedCount()
+	syncedCount, err := w.Ig.GetAllSyncedCount()
 	if err != nil {
+		logrus.Errorf("GetAllSyncedCount failed: %v", err)
 		return 0, 0, false
 	}
 	sourceCount, err := w.Src.GetAllSourceReadRowsCount()
 	if err != nil {
+		logrus.Errorf("GetAllSourceReadRowsCount failed: %v", err)
 		return 0, 0, false
 	}
 	return syncedCount, sourceCount, syncedCount == sourceCount
@@ -214,8 +229,12 @@ func (w *Worker) IsWorkerCorrect() (int, int, bool) {
 
 func (w *Worker) Run(ctx context.Context) {
 	logrus.Printf("Worker %s checking before start", w.Name)
-	syncedCount, err := w.ig.GetAllSyncedCount()
+	syncedCount, err := w.Ig.GetAllSyncedCount()
 	if err != nil || syncedCount != 0 {
+		if syncedCount != 0 {
+			logrus.Errorf("syncedCount is not 0, already ingested %d rows", syncedCount)
+			return
+		}
 		logrus.Errorf("pre-check failed: %v", err)
 		return
 	}

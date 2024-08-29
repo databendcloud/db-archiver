@@ -37,7 +37,7 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 	for db, tables := range dbTables {
 		for _, table := range tables {
 			wg.Add(1)
-			w := worker.NewWorker(testConfig, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
+			w := worker.NewWorkerForTest(testConfig, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
 			go func() {
 				w.Run(context.Background())
 				wg.Done()
@@ -48,7 +48,7 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
-	err = checkTargetTable("test_table2")
+	err = checkTargetTable("test_table2", 15)
 	assert.NoError(t, err)
 }
 
@@ -58,7 +58,6 @@ func TestWorkFlow(t *testing.T) {
 	testConfig := prepareTestConfig()
 	startTime := time.Now()
 
-	ig := ingester.NewDatabendIngester(testConfig)
 	src, err := source.NewSource(testConfig)
 	if err != nil {
 		panic(err)
@@ -75,11 +74,19 @@ func TestWorkFlow(t *testing.T) {
 	for db, tables := range dbTables {
 		for _, table := range tables {
 			wg.Add(1)
-			w := worker.NewWorker(testConfig, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
-			go func() {
+			db := db
+			table := table
+			go func(cfg *cfg.Config, db, table string) {
+				cfgCopy := *testConfig
+				cfgCopy.SourceTable = table
+				cfgCopy.SourceDB = db
+				ig := ingester.NewDatabendIngester(&cfgCopy)
+				src, err := source.NewSource(&cfgCopy)
+				assert.NoError(t, err)
+				w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
 				w.Run(context.Background())
 				wg.Done()
-			}()
+			}(testConfig, db, table)
 		}
 	}
 	wg.Wait()
@@ -87,7 +94,7 @@ func TestWorkFlow(t *testing.T) {
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
 
-	err = checkTargetTable("test_table")
+	err = checkTargetTable("test_table", 20)
 	assert.NoError(t, err)
 }
 
@@ -137,7 +144,7 @@ CREATE TABLE db2.test_table2 (
 		}
 	}
 
-	for i := 1; i <= 10; i++ {
+	for i := 1; i <= 5; i++ {
 		_, err = db.Exec(`
 			INSERT INTO db2.test_table2
 			(id, int_col, varchar_col, float_col, de, bool_col, date_col,  datetime_col, timestamp_col) 
@@ -294,7 +301,7 @@ func prepareMultipleConfig() *cfg.Config {
 	return &config
 }
 
-func checkTargetTable(tableName string) error {
+func checkTargetTable(tableName string, target int) error {
 	db, err := sql.Open("databend", "http://databend:databend@localhost:8000")
 	if err != nil {
 		log.Fatal(err)
@@ -333,8 +340,8 @@ func checkTargetTable(tableName string) error {
 	defer rows.Close()
 	defer db.Close()
 	fmt.Println("target table count: ", count)
-	if count != 20 {
-		return fmt.Errorf("target table count not equal 20")
+	if count != target {
+		return fmt.Errorf("target table count not equal %d", target)
 	}
 	return nil
 }
