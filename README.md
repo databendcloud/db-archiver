@@ -79,6 +79,7 @@ NOTE: 1. To reduce the server load, we set the `sourceSplitKey` which is the pri
 The `sourceSplitTimeKey` is used to split the data by the time column. And the `sourceSplitTimeKey` and `sourceSplitKey` must be set at least one.
 2. `sourceDbTables` is used to sync the data from multiple tables. The format is `db.*@table.*` or `db.table.*`. The `.*` is a regex pattern. The `db.*@table.*` means all tables match the regex pattern `table.*` in the database match the regex pattern `db.*`. 
 3. `sourceDbTables` has a higher priority than `sourceTable` and `sourceDB`. If `sourceDbTables` is set, the `sourceTable` will be ignored.
+4. The `database` and `table` all support regex pattern. 
 
 
 ## Two modes
