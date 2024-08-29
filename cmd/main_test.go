@@ -45,7 +45,7 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 				ig := ingester.NewDatabendIngester(&cfgCopy)
 				src, err := source.NewSource(&cfgCopy)
 				assert.NoError(t, err)
-				w := worker.NewWorkerForTest(&cfgCopy, db, table, fmt.Sprintf("%s.%s", db, table), ig, src)
+				w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
 				w.Run(context.Background())
 				wg.Done()
 			}(testConfig, db, table)
