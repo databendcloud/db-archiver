@@ -78,18 +78,6 @@ func (s *Source) GetSourceReadRowsCount(table, db string) (int, error) {
 	return rowCount, nil
 }
 
-func (s *Source) GetRowsCountByConditionSql(conditionSql string) (int, error) {
-	rowCountQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s WHERE %s", s.cfg.SourceDB, s.cfg.SourceTable, conditionSql)
-	row := s.db.QueryRow(rowCountQuery)
-	var rowCount int
-	err := row.Scan(&rowCount)
-	if err != nil {
-		return 0, err
-	}
-
-	return rowCount, nil
-}
-
 func (s *Source) GetMinMaxSplitKey() (int, int, error) {
 	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitKey,
 		s.cfg.SourceSplitKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
@@ -385,7 +373,6 @@ func (s *Source) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern stri
 func (s *Source) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
 	dbTables := make(map[string][]string)
 	for _, database := range databases {
-		fmt.Println("database: ", database)
 		rows, err := s.db.Query(fmt.Sprintf("SHOW TABLES FROM %s", database))
 		if err != nil {
 			return nil, err
@@ -423,7 +410,6 @@ func (s *Source) GetDbTablesAccordingToSourceDbTables() (map[string][]string, er
 		if err != nil {
 			return nil, fmt.Errorf("get databases according to sourceDbRegex failed: %v", err)
 		}
-		fmt.Println("dbTable-sjh", dbTable)
 		dbTables, err := s.GetTablesAccordingToSourceTableRegex(dbTable[1], dbs)
 		if err != nil {
 			return nil, fmt.Errorf("get tables according to sourceTableRegex failed: %v", err)
