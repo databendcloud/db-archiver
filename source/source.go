@@ -38,7 +38,7 @@ func NewSource(cfg *config.Config) (*Source, error) {
 		logrus.Errorf("failed to open db: %v", err)
 		return nil, err
 	}
-	fmt.Printf("connected to mysql successfully %v", cfg)
+	//fmt.Printf("connected to mysql successfully %v", cfg)
 	return &Source{
 		db:            db,
 		cfg:           cfg,
