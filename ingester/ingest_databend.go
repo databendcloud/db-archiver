@@ -59,8 +59,8 @@ func (ig *databendIngester) GetAllSyncedCount() (int, error) {
 		return 0, err
 	}
 	defer rows.Close()
+	var count int
 	if rows.Next() {
-		var count int
 		err = rows.Scan(&count)
 		if err != nil {
 			return 0, err

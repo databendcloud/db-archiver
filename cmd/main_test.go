@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/test-go/testify/assert"
 
 	cfg "github.com/databendcloud/db-archiver/config"
 	"github.com/databendcloud/db-archiver/ingester"
@@ -19,42 +20,161 @@ import (
 	_ "github.com/datafuselabs/databend-go"
 )
 
+func TestMultipleDbTablesWorkflow(t *testing.T) {
+
+	prepareDbxTablex()
+	prepareDatabend("test_table2")
+
+	testConfig := prepareMultipleConfig()
+	startTime := time.Now()
+
+	src, err := source.NewSource(testConfig)
+	assert.NoError(t, err)
+	wg := sync.WaitGroup{}
+	dbTables, err := src.GetDbTablesAccordingToSourceDbTables()
+	assert.NoError(t, err)
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			wg.Add(1)
+			db := db
+			table := table
+			go func(cfg *cfg.Config, db, table string) {
+				cfgCopy := *testConfig
+				cfgCopy.SourceDB = db
+				cfgCopy.SourceTable = table
+				ig := ingester.NewDatabendIngester(&cfgCopy)
+				src, err := source.NewSource(&cfgCopy)
+				assert.NoError(t, err)
+				w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
+				w.Run(context.Background())
+				wg.Done()
+			}(testConfig, db, table)
+		}
+	}
+	wg.Wait()
+	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Println(endTime)
+	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
+	err = checkTargetTable("test_table2", 15)
+	assert.NoError(t, err)
+}
+
 func TestWorkFlow(t *testing.T) {
 	prepareMysql()
-	prepareDatabend()
+	prepareDatabend("test_table")
 	testConfig := prepareTestConfig()
 	startTime := time.Now()
 
-	ig := ingester.NewDatabendIngester(testConfig)
 	src, err := source.NewSource(testConfig)
 	if err != nil {
 		panic(err)
 	}
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	w := worker.NewWorker(testConfig, fmt.Sprintf("worker"), ig, src)
-	go func() {
-		w.Run(context.TODO())
-		wg.Done()
-	}()
+	dbs, err := src.GetDatabasesAccordingToSourceDbRegex(testConfig.SourceDB)
+	if err != nil {
+		panic(err)
+	}
+	dbTables, err := src.GetTablesAccordingToSourceTableRegex(testConfig.SourceTable, dbs)
+	if err != nil {
+		panic(err)
+	}
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			wg.Add(1)
+			db := db
+			table := table
+			go func(cfg *cfg.Config, db, table string) {
+				cfgCopy := *testConfig
+				cfgCopy.SourceTable = table
+				cfgCopy.SourceDB = db
+				ig := ingester.NewDatabendIngester(&cfgCopy)
+				src, err := source.NewSource(&cfgCopy)
+				assert.NoError(t, err)
+				w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
+				w.Run(context.Background())
+				wg.Done()
+			}(testConfig, db, table)
+		}
+	}
 	wg.Wait()
 	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
 
-	checkTargetTable()
+	err = checkTargetTable("test_table", 20)
+	assert.NoError(t, err)
 }
 
-func prepareMysql() {
-	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/default")
+func prepareDbxTablex() {
+	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/mysql")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
+	db.Exec("create database if not exists db1")
+	db.Exec("create database if not exists db2")
+	db.Exec(`
+CREATE TABLE db1.test_table1 (
+	id BIGINT UNSIGNED PRIMARY KEY,
+	int_col INT,
+	varchar_col VARCHAR(255),
+	float_col FLOAT,
+	bool_col BOOL,
+	de decimal(18,6),
+	date_col DATE,
+	datetime_col DATETIME,
+	timestamp_col TIMESTAMP
+)
+`)
+	db.Exec(`
+CREATE TABLE db2.test_table2 (
+    	id BIGINT UNSIGNED PRIMARY KEY,
+    		int_col INT,
+    		varchar_col VARCHAR(255),
+    		float_col FLOAT,
+    		bool_col BOOL,
+    		de decimal(18,6),
+    		date_col DATE,
+    		datetime_col DATETIME,
+    		timestamp_col TIMESTAMP
+	)
+`)
+	for i := 1; i <= 10; i++ {
+		_, err = db.Exec(`
+			INSERT INTO db1.test_table1
+			(id, int_col, varchar_col, float_col, de, bool_col, date_col,  datetime_col, timestamp_col) 
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, i, i, fmt.Sprintf("varchar %d", i), float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", "2024-06-30 20:00:00")
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	for i := 1; i <= 5; i++ {
+		_, err = db.Exec(`
+			INSERT INTO db2.test_table2
+			(id, int_col, varchar_col, float_col, de, bool_col, date_col,  datetime_col, timestamp_col) 
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, i+1, i, fmt.Sprintf("varchar %d", i), float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", "2024-06-30 20:00:00")
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func prepareMysql() {
+	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/mysql")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	db.Exec("Create database if not exists mydb")
+	db.Exec("Use mydb")
+
 	// Create table
 	_, err = db.Exec(`
-		CREATE TABLE test_table (
+		CREATE TABLE mydb.test_table (
 			id BIGINT UNSIGNED PRIMARY KEY,
 			int_col INT,
 			varchar_col VARCHAR(255),
@@ -74,7 +194,7 @@ func prepareMysql() {
 	// Insert data
 	for i := 1; i <= 10; i++ {
 		_, err = db.Exec(`
-			INSERT INTO test_table 
+			INSERT INTO mydb.test_table 
 			(id, int_col, varchar_col, float_col, de, bool_col, date_col,  datetime_col, timestamp_col) 
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, i, i, fmt.Sprintf("varchar %d", i), float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", "2024-06-30 20:00:00")
@@ -97,7 +217,7 @@ func prepareMysql() {
 			timeCol = sql.NullTime{Valid: false}
 		}
 		_, err = db.Exec(`
-		INSERT INTO test_table 
+		INSERT INTO mydb.test_table 
 		(id, int_col, varchar_col, float_col, de, bool_col, date_col,  datetime_col, timestamp_col) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, i*11, intCol, varcharCol, float64(i), i%2 == 0, 1.1, "2022-01-01", "2022-01-01 00:00:00", timeCol)
@@ -107,7 +227,7 @@ func prepareMysql() {
 	}
 }
 
-func prepareDatabend() {
+func prepareDatabend(tableName string) {
 	db, err := sql.Open("databend", "http://databend:databend@localhost:8000")
 	if err != nil {
 		log.Fatal(err)
@@ -115,19 +235,19 @@ func prepareDatabend() {
 	defer db.Close()
 
 	// Create table
-	_, err = db.Exec(`
-		CREATE TABLE test_table (
-			id UINT64,
-			int_col INT,
-			varchar_col VARCHAR(255),
-			float_col FLOAT,
-			bool_col TINYINT,
-			de decimal(18,6),
-			date_col DATE,
-			datetime_col TIMESTAMP,
-			timestamp_col TIMESTAMP
-		)
-	`)
+	_, err = db.Exec(fmt.Sprintf(
+		`CREATE TABLE if not exists default.%s (
+		id UINT64,
+		int_col INT,
+		varchar_col VARCHAR(255),
+		float_col FLOAT,
+		bool_col TINYINT,
+		de decimal(18,6),
+		date_col DATE,
+		datetime_col TIMESTAMP,
+		timestamp_col TIMESTAMP
+	)
+	`, tableName))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -135,14 +255,14 @@ func prepareDatabend() {
 
 func prepareTestConfig() *cfg.Config {
 	config := cfg.Config{
-		SourceDB:             "default",
+		SourceDB:             "mydb",
 		SourceHost:           "127.0.0.1",
 		SourcePort:           3306,
 		SourceUser:           "root",
 		SourcePass:           "123456",
 		SourceTable:          "test_table",
 		SourceWhereCondition: "id > 0",
-		SourceQuery:          "select * from default.test_table",
+		SourceQuery:          "select * from mydb.test_table",
 		SourceSplitKey:       "id",
 		SourceSplitTimeKey:   "",
 		DatabendDSN:          "http://databend:databend@localhost:8000",
@@ -160,18 +280,46 @@ func prepareTestConfig() *cfg.Config {
 	return &config
 }
 
-func checkTargetTable() {
+func prepareMultipleConfig() *cfg.Config {
+	config := cfg.Config{
+		SourceDB:             "mydb",
+		SourceHost:           "127.0.0.1",
+		SourcePort:           3306,
+		SourceUser:           "root",
+		SourcePass:           "123456",
+		SourceDbTables:       []string{"db.*@test_table.*"},
+		SourceTable:          "test_table",
+		SourceWhereCondition: "id > 0",
+		SourceQuery:          "select * from mydb2.test_table",
+		SourceSplitKey:       "id",
+		SourceSplitTimeKey:   "",
+		DatabendDSN:          "http://databend:databend@localhost:8000",
+		DatabendTable:        "default.test_table2",
+		BatchSize:            5,
+		BatchMaxInterval:     3,
+		MaxThread:            2,
+		CopyForce:            false,
+		CopyPurge:            false,
+		DeleteAfterSync:      false,
+		DisableVariantCheck:  false,
+		UserStage:            "~",
+	}
+
+	return &config
+}
+
+func checkTargetTable(tableName string, target int) error {
 	db, err := sql.Open("databend", "http://databend:databend@localhost:8000")
 	if err != nil {
 		log.Fatal(err)
+		return err
 	}
 	defer db.Close()
 
-	rows, err := db.Query(`
-		SELECT * FROM default.test_table
-	`)
+	rows, err := db.Query(fmt.Sprintf(`SELECT * FROM default.%s`, tableName))
 	if err != nil {
 		log.Fatal(err)
+		return err
 	}
 	defer rows.Close()
 	count := 0
@@ -199,7 +347,8 @@ func checkTargetTable() {
 	defer rows.Close()
 	defer db.Close()
 	fmt.Println("target table count: ", count)
-	if count != 20 {
-		panic("target table count not equal 10")
+	if count != target {
+		return fmt.Errorf("target table count not equal %d", target)
 	}
+	return nil
 }

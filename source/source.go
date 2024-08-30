@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -27,15 +29,16 @@ type Sourcer interface {
 
 func NewSource(cfg *config.Config) (*Source, error) {
 	stats := NewDatabendIntesterStatsRecorder()
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/mysql",
 		cfg.SourceUser,
 		cfg.SourcePass,
 		cfg.SourceHost,
-		cfg.SourcePort,
-		cfg.SourceDB))
+		cfg.SourcePort))
 	if err != nil {
+		logrus.Errorf("failed to open db: %v", err)
 		return nil, err
 	}
+	//fmt.Printf("connected to mysql successfully %v", cfg)
 	return &Source{
 		db:            db,
 		cfg:           cfg,
@@ -43,21 +46,29 @@ func NewSource(cfg *config.Config) (*Source, error) {
 	}, nil
 }
 
-func (s *Source) GetSourceReadRowsCount() (int, error) {
-	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", s.cfg.SourceDB,
-		s.cfg.SourceTable, s.cfg.SourceWhereCondition))
-	var rowCount int
-	err := row.Scan(&rowCount)
+func (s *Source) GetAllSourceReadRowsCount() (int, error) {
+	allCount := 0
+
+	dbTables, err := s.GetDbTablesAccordingToSourceDbTables()
 	if err != nil {
 		return 0, err
 	}
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			count, err := s.GetSourceReadRowsCount(table, db)
+			if err != nil {
+				return 0, err
+			}
+			allCount += count
+		}
+	}
 
-	return rowCount, nil
+	return allCount, nil
 }
 
-func (s *Source) GetRowsCountByConditionSql(conditionSql string) (int, error) {
-	rowCountQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s WHERE %s", s.cfg.SourceDB, s.cfg.SourceTable, conditionSql)
-	row := s.db.QueryRow(rowCountQuery)
+func (s *Source) GetSourceReadRowsCount(table, db string) (int, error) {
+	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", db,
+		table, s.cfg.SourceWhereCondition))
 	var rowCount int
 	err := row.Scan(&rowCount)
 	if err != nil {
@@ -330,6 +341,84 @@ func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeS
 	}
 
 	return conditions, nil
+}
+
+func (s *Source) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern string) ([]string, error) {
+	rows, err := s.db.Query("SHOW DATABASES")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var databases []string
+	for rows.Next() {
+		var database string
+		err = rows.Scan(&database)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println("sourcedatabase pattern", sourceDatabasePattern)
+		match, err := regexp.MatchString(sourceDatabasePattern, database)
+		if err != nil {
+			return nil, err
+		}
+		if match {
+			fmt.Println("match db: ", database)
+			databases = append(databases, database)
+		}
+	}
+	return databases, nil
+}
+
+func (s *Source) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
+	dbTables := make(map[string][]string)
+	for _, database := range databases {
+		rows, err := s.db.Query(fmt.Sprintf("SHOW TABLES FROM %s", database))
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		var tables []string
+		for rows.Next() {
+			var table string
+			err = rows.Scan(&table)
+			if err != nil {
+				return nil, err
+			}
+			match, err := regexp.MatchString(sourceTablePattern, table)
+			if err != nil {
+				return nil, err
+			}
+			if match {
+				tables = append(tables, table)
+			}
+		}
+		dbTables[database] = tables
+	}
+	return dbTables, nil
+}
+
+func (s *Source) GetDbTablesAccordingToSourceDbTables() (map[string][]string, error) {
+	allDbTables := make(map[string][]string)
+	for _, sourceDbTable := range s.cfg.SourceDbTables {
+		dbTable := strings.Split(sourceDbTable, "@") // because `.` in regex is a special character, so use `@` to split
+		if len(dbTable) != 2 {
+			return nil, fmt.Errorf("invalid sourceDbTable: %s, should be a.b format", sourceDbTable)
+		}
+		dbs, err := s.GetDatabasesAccordingToSourceDbRegex(dbTable[0])
+		if err != nil {
+			return nil, fmt.Errorf("get databases according to sourceDbRegex failed: %v", err)
+		}
+		dbTables, err := s.GetTablesAccordingToSourceTableRegex(dbTable[1], dbs)
+		if err != nil {
+			return nil, fmt.Errorf("get tables according to sourceTableRegex failed: %v", err)
+		}
+		for db, tables := range dbTables {
+			allDbTables[db] = append(allDbTables[db], tables...)
+		}
+	}
+	return allDbTables, nil
 }
 
 func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, error) {

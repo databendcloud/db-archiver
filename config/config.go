@@ -35,15 +35,16 @@ var StringToTimeSplitUnit = map[string]TimeSplitUnit{
 
 type Config struct {
 	// Source configuration
-	SourceHost           string `json:"sourceHost"`
-	SourcePort           int    `json:"sourcePort"`
-	SourceUser           string `json:"sourceUser"`
-	SourcePass           string `json:"sourcePass"`
-	SourceDB             string `json:"sourceDB"`
-	SourceTable          string `json:"sourceTable"`
-	SourceQuery          string `json:"sourceQuery"`          // select * from table where condition
-	SourceWhereCondition string `json:"sourceWhereCondition"` //example: where id > 100 and id < 200 and time > '2023-01-01'
-	SourceSplitKey       string `json:"sourceSplitKey"`       // primary split key for split table, only for int type
+	SourceHost           string   `json:"sourceHost"`
+	SourcePort           int      `json:"sourcePort"`
+	SourceUser           string   `json:"sourceUser"`
+	SourcePass           string   `json:"sourcePass"`
+	SourceDB             string   `json:"sourceDB"`
+	SourceTable          string   `json:"sourceTable"`
+	SourceDbTables       []string `json:"sourceDbTables"`       // source db tables format: [db1.table1,db2.table2] or [db.*@table.*,mydb.*.table.*]
+	SourceQuery          string   `json:"sourceQuery"`          // select * from table where condition
+	SourceWhereCondition string   `json:"sourceWhereCondition"` //example: where id > 100 and id < 200 and time > '2023-01-01'
+	SourceSplitKey       string   `json:"sourceSplitKey"`       // primary split key for split table, only for int type
 	// the format of time field must be: 2006-01-02 15:04:05
 	SourceSplitTimeKey string `json:"SourceSplitTimeKey"`           // time field for split table
 	TimeSplitUnit      string `json:"TimeSplitUnit" default:"hour"` // time split unit, default is hour, option is: minute, hour, day
