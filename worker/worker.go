@@ -87,6 +87,10 @@ func (w *Worker) stepBatch() error {
 	if err != nil {
 		return err
 	}
+	if minSplitKey == 0 && maxSplitKey == 0 {
+		logrus.Infof("db.table is %s.%s, minSplitKey: %d, maxSplitKey : %d", w.Cfg.SourceDB, w.Cfg.SourceTable, minSplitKey, maxSplitKey)
+		return nil
+	}
 	logrus.Infof("db.table is %s.%s, minSplitKey: %d, maxSplitKey : %d", w.Cfg.SourceDB, w.Cfg.SourceTable, minSplitKey, maxSplitKey)
 
 	if w.IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, w.Cfg.BatchSize) {

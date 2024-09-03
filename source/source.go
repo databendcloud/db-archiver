@@ -86,14 +86,20 @@ func (s *Source) GetMinMaxSplitKey() (int, int, error) {
 	}
 	defer rows.Close()
 
-	var minSplitKey, maxSplitKey int
+	var minSplitKey, maxSplitKey sql.NullInt64
 	for rows.Next() {
 		err = rows.Scan(&minSplitKey, &maxSplitKey)
 		if err != nil {
 			return 0, 0, err
 		}
 	}
-	return minSplitKey, maxSplitKey, nil
+
+	// Check if minSplitKey and maxSplitKey are valid (not NULL)
+	if !minSplitKey.Valid || !maxSplitKey.Valid {
+		return 0, 0, nil
+	}
+
+	return int(minSplitKey.Int64), int(maxSplitKey.Int64), nil
 }
 
 func (s *Source) GetMinMaxTimeSplitKey() (string, string, error) {
