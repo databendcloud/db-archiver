@@ -77,8 +77,8 @@ func calculateBytesSize(batch [][]interface{}) int {
 	return len(bytes)
 }
 
-func (w *Worker) IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, batchSize int) bool {
-	return (maxSplitKey-minSplitKey)/batchSize > w.Cfg.MaxThread
+func (w *Worker) IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, batchSize int64) bool {
+	return (maxSplitKey-minSplitKey)/batchSize > int64(w.Cfg.MaxThread)
 }
 
 func (w *Worker) stepBatch() error {
@@ -174,8 +174,8 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 	return nil
 }
 
-func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int) error {
-	offset := 0
+func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int64) error {
+	var offset int64 = 0
 	for {
 		batchSql := fmt.Sprintf("%s LIMIT %d OFFSET %d", conditionSql, batchSize, offset)
 		data, columns, err := w.Src.QueryTableData(1, batchSql)
