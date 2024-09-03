@@ -80,27 +80,40 @@ func TestSplitConditionAccordingMaxGoRoutine(t *testing.T) {
 	}
 	source, _ := NewMockSource(cfg)
 	conditions := source.SplitConditionAccordingMaxGoRoutine(0, 100, 100)
-	if len(conditions) != 12 {
+	var count0 = 0
+	for condition := range conditions {
+		fmt.Printf(condition)
+		count0++
+	}
+	if count0 != 12 {
 		t.Errorf("Expected 12 conditions, got %d", len(conditions))
 	}
 
 	// Test when minSplitKey is less than maxSplitKey and maxSplitKey is less than allMax
 	conditions = source.SplitConditionAccordingMaxGoRoutine(0, 50, 100)
-	if len(conditions) != 6 {
-		t.Errorf("Expected 6 conditions, got %d", len(conditions))
+	var count1 = 0
+	for condition := range conditions {
+		fmt.Printf(condition)
+		count1++
+		if count1 == 5 {
+			assert.Equal(t, condition, fmt.Sprintf("(%s >= %d and %s < %d)", cfg.SourceSplitKey, 36, cfg.SourceSplitKey, 45))
+		}
 	}
-	if conditions[4] != fmt.Sprintf("(%s >= %d and %s < %d)", cfg.SourceSplitKey, 36, cfg.SourceSplitKey, 45) {
-		t.Errorf("Expected last condition to be (%s >= %d and %s < %d), got %s", cfg.SourceSplitKey, 36, cfg.SourceSplitKey, 45, conditions[4])
+	if count1 != 6 {
+		t.Errorf("Expected 6 conditions, got %d", len(conditions))
 	}
 
 	// Test when minSplitKey is less than maxSplitKey and maxSplitKey is equal to allMax
 	conditions = source.SplitConditionAccordingMaxGoRoutine(0, 100, 100)
-	println(conditions)
-	if len(conditions) != 12 {
-		t.Errorf("Expected 12 conditions, got %d", len(conditions))
+	var count2 = 0
+	for condition := range conditions {
+		count2++
+		if count2 == 10 {
+			assert.Equal(t, condition, fmt.Sprintf("(%s >= %d and %s < %d)", cfg.SourceSplitKey, 81, cfg.SourceSplitKey, 90))
+		}
 	}
-	if conditions[9] != fmt.Sprintf("(%s >= %d and %s < %d)", cfg.SourceSplitKey, 81, cfg.SourceSplitKey, 90) {
-		t.Errorf("Expected last condition to be (%s >= %d and %s < %d), got %s", cfg.SourceSplitKey, 81, cfg.SourceSplitKey, 90, conditions[9])
+	if count2 != 12 {
+		t.Errorf("Expected 12 conditions, got %d", len(conditions))
 	}
 
 	// Test when minSplitKey is greater than maxSplitKey
