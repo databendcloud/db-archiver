@@ -93,6 +93,15 @@ func main() {
 	//}
 	//wg.Wait()
 	w := &worker.Worker{Cfg: cfg, Ig: ig, Src: src, Name: "dbarchiver"}
+	syncedCount, err := w.Ig.GetAllSyncedCount()
+	if err != nil || syncedCount != 0 {
+		if syncedCount != 0 {
+			logrus.Errorf("syncedCount is not 0, already ingested %d rows", syncedCount)
+			return
+		}
+		logrus.Errorf("pre-check failed: %v", err)
+		return
+	}
 	for db, tables := range dbTables {
 		for _, table := range tables {
 			logrus.Infof("Start worker %s.%s", db, table)

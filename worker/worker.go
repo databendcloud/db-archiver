@@ -214,15 +214,6 @@ func (w *Worker) IsWorkerCorrect() (int, int, bool) {
 
 func (w *Worker) Run(ctx context.Context) {
 	logrus.Printf("Worker %s checking before start", w.Name)
-	syncedCount, err := w.Ig.GetAllSyncedCount()
-	if err != nil || syncedCount != 0 {
-		if syncedCount != 0 {
-			logrus.Errorf("syncedCount is not 0, already ingested %d rows", syncedCount)
-			return
-		}
-		logrus.Errorf("pre-check failed: %v", err)
-		return
-	}
 
 	logrus.Printf("Starting worker %s", w.Name)
 	if w.Cfg.SourceSplitTimeKey != "" {
