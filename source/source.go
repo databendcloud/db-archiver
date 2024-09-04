@@ -78,7 +78,7 @@ func (s *Source) GetSourceReadRowsCount(table, db string) (int, error) {
 	return rowCount, nil
 }
 
-func (s *Source) GetMinMaxSplitKey() (int, int, error) {
+func (s *Source) GetMinMaxSplitKey() (int64, int64, error) {
 	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitKey,
 		s.cfg.SourceSplitKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
 	if err != nil {
@@ -99,7 +99,7 @@ func (s *Source) GetMinMaxSplitKey() (int, int, error) {
 		return 0, 0, nil
 	}
 
-	return int(minSplitKey.Int64), int(maxSplitKey.Int64), nil
+	return minSplitKey.Int64, maxSplitKey.Int64, nil
 }
 
 func (s *Source) GetMinMaxTimeSplitKey() (string, string, error) {
@@ -120,20 +120,20 @@ func (s *Source) GetMinMaxTimeSplitKey() (string, string, error) {
 	return minSplitKey, maxSplitKey, nil
 }
 
-func (s *Source) SlimCondition(minSplitKey, maxSplitKey int) [][]int {
-	var conditions [][]int
+func (s *Source) SlimCondition(minSplitKey, maxSplitKey int64) [][]int64 {
+	var conditions [][]int64
 	if minSplitKey > maxSplitKey {
 		return conditions
 	}
-	rangeSize := (maxSplitKey - minSplitKey) / s.cfg.MaxThread
+	rangeSize := (maxSplitKey - minSplitKey) / int64(s.cfg.MaxThread)
 	for i := 0; i < s.cfg.MaxThread; i++ {
-		lowerBound := minSplitKey + rangeSize*i
+		lowerBound := minSplitKey + rangeSize*int64(i)
 		upperBound := lowerBound + rangeSize
 		if i == s.cfg.MaxThread-1 {
 			// Ensure the last condition includes maxSplitKey
 			upperBound = maxSplitKey
 		}
-		conditions = append(conditions, []int{lowerBound, upperBound})
+		conditions = append(conditions, []int64{lowerBound, upperBound})
 	}
 	return conditions
 }
@@ -257,7 +257,7 @@ func (s *Source) QueryTableData(threadNum int, conditionSql string) ([][]interfa
 	return result, columns, nil
 }
 
-func (s *Source) SplitCondition(minSplitKey, maxSplitKey int) []string {
+func (s *Source) SplitCondition(minSplitKey, maxSplitKey int64) []string {
 	var conditions []string
 	for {
 		if minSplitKey >= maxSplitKey {
@@ -270,31 +270,37 @@ func (s *Source) SplitCondition(minSplitKey, maxSplitKey int) []string {
 	return conditions
 }
 
-func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, allMax int) []string {
-	var conditions []string
-	if minSplitKey > maxSplitKey {
-		return conditions
-	}
+func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, allMax int64) <-chan string {
+	conditions := make(chan string, 100) // make a buffered channel
 
-	for {
-		if (minSplitKey + s.cfg.BatchSize - 1) >= maxSplitKey {
-			if minSplitKey > allMax {
-				return conditions
-			}
-			if maxSplitKey == allMax {
-				conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey))
-			} else {
-				conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey))
-			}
-			break
+	go func() {
+		defer close(conditions) // make sure close channel
+
+		if minSplitKey > maxSplitKey {
+			return
 		}
-		if (minSplitKey + s.cfg.BatchSize - 1) >= allMax {
-			conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, allMax))
-			return conditions
+
+		for {
+			if (minSplitKey + s.cfg.BatchSize - 1) >= maxSplitKey {
+				if minSplitKey > allMax {
+					return
+				}
+				if maxSplitKey == allMax {
+					conditions <- fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey)
+				} else {
+					conditions <- fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey)
+				}
+				break
+			}
+			if (minSplitKey + s.cfg.BatchSize - 1) >= allMax {
+				conditions <- fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, allMax)
+				return
+			}
+			conditions <- fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, minSplitKey+s.cfg.BatchSize-1)
+			minSplitKey += s.cfg.BatchSize - 1
 		}
-		conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, minSplitKey+s.cfg.BatchSize-1))
-		minSplitKey += s.cfg.BatchSize - 1
-	}
+	}()
+
 	return conditions
 }
 

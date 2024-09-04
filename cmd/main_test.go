@@ -30,28 +30,22 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 
 	src, err := source.NewSource(testConfig)
 	assert.NoError(t, err)
-	wg := sync.WaitGroup{}
 	dbTables, err := src.GetDbTablesAccordingToSourceDbTables()
 	assert.NoError(t, err)
 	for db, tables := range dbTables {
 		for _, table := range tables {
-			wg.Add(1)
 			db := db
 			table := table
-			go func(cfg *cfg.Config, db, table string) {
-				cfgCopy := *testConfig
-				cfgCopy.SourceDB = db
-				cfgCopy.SourceTable = table
-				ig := ingester.NewDatabendIngester(&cfgCopy)
-				src, err := source.NewSource(&cfgCopy)
-				assert.NoError(t, err)
-				w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
-				w.Run(context.Background())
-				wg.Done()
-			}(testConfig, db, table)
+			cfgCopy := *testConfig
+			cfgCopy.SourceDB = db
+			cfgCopy.SourceTable = table
+			ig := ingester.NewDatabendIngester(&cfgCopy)
+			src, err := source.NewSource(&cfgCopy)
+			assert.NoError(t, err)
+			w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
+			w.Run(context.Background())
 		}
 	}
-	wg.Wait()
 	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))

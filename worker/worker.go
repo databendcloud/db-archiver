@@ -77,8 +77,8 @@ func calculateBytesSize(batch [][]interface{}) int {
 	return len(bytes)
 }
 
-func (w *Worker) IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, batchSize int) bool {
-	return (maxSplitKey-minSplitKey)/batchSize > w.Cfg.MaxThread
+func (w *Worker) IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, batchSize int64) bool {
+	return (maxSplitKey-minSplitKey)/batchSize > int64(w.Cfg.MaxThread)
 }
 
 func (w *Worker) stepBatch() error {
@@ -106,7 +106,7 @@ func (w *Worker) stepBatch() error {
 				if err != nil {
 					logrus.Errorf("stepBatchWithCondition failed: %v", err)
 				}
-				for _, condition := range conditions {
+				for condition := range conditions {
 					logrus.Infof("condition: %s", condition)
 					err := w.stepBatchWithCondition(idx, condition)
 					if err != nil {
@@ -174,8 +174,8 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 	return nil
 }
 
-func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int) error {
-	offset := 0
+func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int64) error {
+	var offset int64 = 0
 	for {
 		batchSql := fmt.Sprintf("%s LIMIT %d OFFSET %d", conditionSql, batchSize, offset)
 		data, columns, err := w.Src.QueryTableData(1, batchSql)
@@ -214,15 +214,6 @@ func (w *Worker) IsWorkerCorrect() (int, int, bool) {
 
 func (w *Worker) Run(ctx context.Context) {
 	logrus.Printf("Worker %s checking before start", w.Name)
-	syncedCount, err := w.Ig.GetAllSyncedCount()
-	if err != nil || syncedCount != 0 {
-		if syncedCount != 0 {
-			logrus.Errorf("syncedCount is not 0, already ingested %d rows", syncedCount)
-			return
-		}
-		logrus.Errorf("pre-check failed: %v", err)
-		return
-	}
 
 	logrus.Printf("Starting worker %s", w.Name)
 	if w.Cfg.SourceSplitTimeKey != "" {
