@@ -77,6 +77,7 @@ func calculateBytesSize(batch [][]interface{}) int {
 	return len(bytes)
 }
 
+// IsSplitAccordingMaxGoRoutine checks if the split key is according to the max go routine
 func (w *Worker) IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, batchSize int64) bool {
 	return (maxSplitKey-minSplitKey)/batchSize > int64(w.Cfg.MaxThread)
 }

@@ -46,6 +46,30 @@ func NewSource(cfg *config.Config) (*Source, error) {
 	}, nil
 }
 
+// AdjustBatchSizeAccordingToSourceDbTable has a concept called s,  s = (maxKey - minKey) / sourceTableRowCount
+// if s == 1 it means the data is uniform in the table, if s is much bigger than 1, it means the data is not uniform in the table
+func (s *Source) AdjustBatchSizeAccordingToSourceDbTable() int64 {
+	minSplitKey, maxSplitKey, err := s.GetMinMaxSplitKey()
+	if err != nil {
+		return s.cfg.BatchSize
+	}
+	sourceTableRowCount, err := s.GetSourceReadRowsCount(s.cfg.SourceTable, s.cfg.SourceDB)
+	if err != nil {
+		return s.cfg.BatchSize
+	}
+	rangeSize := maxSplitKey - minSplitKey
+	switch {
+	case int64(sourceTableRowCount) <= s.cfg.BatchSize:
+		return rangeSize
+	case rangeSize/int64(sourceTableRowCount) >= 10:
+		return s.cfg.BatchSize * 5
+	case rangeSize/int64(sourceTableRowCount) >= 100:
+		return s.cfg.BatchSize * 20
+	default:
+		return s.cfg.BatchSize
+	}
+}
+
 func (s *Source) GetAllSourceReadRowsCount() (int, error) {
 	allCount := 0
 

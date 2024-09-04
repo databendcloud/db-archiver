@@ -68,30 +68,6 @@ func main() {
 		}
 	}
 
-	//w := &worker.Worker{Cfg: cfg, Ig: ig, Src: src, Name: "dbarchiver"}
-	//wg := sync.WaitGroup{}
-	//for db, tables := range dbTables {
-	//	for _, table := range tables {
-	//		logrus.Infof("Start worker %s.%s", db, table)
-	//		wg.Add(1)
-	//		db := db
-	//		table := table
-	//		go func(cfg *config.Config, db, table string) {
-	//			cfgCopy := *cfg
-	//			cfgCopy.SourceDB = db
-	//			cfgCopy.SourceTable = table
-	//			ig := ingester.NewDatabendIngester(&cfgCopy)
-	//			src, err := source.NewSource(&cfgCopy)
-	//			if err != nil {
-	//				panic(err)
-	//			}
-	//			w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
-	//			w.Run(ctx)
-	//			wg.Done()
-	//		}(cfg, db, table)
-	//	}
-	//}
-	//wg.Wait()
 	w := &worker.Worker{Cfg: cfg, Ig: ig, Src: src, Name: "dbarchiver"}
 	syncedCount, err := w.Ig.GetAllSyncedCount()
 	if err != nil || syncedCount != 0 {
@@ -115,6 +91,8 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
+			// adjust batch size according to source db table
+			cfgCopy.BatchSize = src.AdjustBatchSizeAccordingToSourceDbTable()
 			w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
 			w.Run(ctx)
 		}
