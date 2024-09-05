@@ -11,12 +11,6 @@ import (
 	"github.com/databendcloud/db-archiver/config"
 )
 
-func NewMockSource(cfg *config.Config) (*Source, error) {
-	return &Source{
-		cfg: cfg,
-	}, nil
-}
-
 func TestSlimCondition(t *testing.T) {
 
 	// Test when minSplitKey is less than maxSplitKey

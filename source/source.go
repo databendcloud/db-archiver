@@ -2,11 +2,9 @@ package source
 
 import (
 	"bufio"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -14,12 +12,6 @@ import (
 
 	"github.com/databendcloud/db-archiver/config"
 )
-
-type Source struct {
-	db            *sql.DB
-	cfg           *config.Config
-	statsRecorder *DatabendSourceStatsRecorder
-}
 
 type Sourcer interface {
 	AdjustBatchSizeAccordingToSourceDbTable() int64
@@ -159,62 +151,6 @@ func SplitConditionAccordingToTimeSplitKey(cfg *config.Config, minTimeSplitKey, 
 	}
 
 	return conditions, nil
-}
-
-func (s *Source) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern string) ([]string, error) {
-	rows, err := s.db.Query("SHOW DATABASES")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var databases []string
-	for rows.Next() {
-		var database string
-		err = rows.Scan(&database)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Println("sourcedatabase pattern", sourceDatabasePattern)
-		match, err := regexp.MatchString(sourceDatabasePattern, database)
-		if err != nil {
-			return nil, err
-		}
-		if match {
-			fmt.Println("match db: ", database)
-			databases = append(databases, database)
-		}
-	}
-	return databases, nil
-}
-
-func (s *Source) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
-	dbTables := make(map[string][]string)
-	for _, database := range databases {
-		rows, err := s.db.Query(fmt.Sprintf("SHOW TABLES FROM %s", database))
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-
-		var tables []string
-		for rows.Next() {
-			var table string
-			err = rows.Scan(&table)
-			if err != nil {
-				return nil, err
-			}
-			match, err := regexp.MatchString(sourceTablePattern, table)
-			if err != nil {
-				return nil, err
-			}
-			if match {
-				tables = append(tables, table)
-			}
-		}
-		dbTables[database] = tables
-	}
-	return dbTables, nil
 }
 
 func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, error) {
