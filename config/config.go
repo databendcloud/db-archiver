@@ -35,6 +35,7 @@ var StringToTimeSplitUnit = map[string]TimeSplitUnit{
 
 type Config struct {
 	// Source configuration
+	DatabaseType         string   `json:"databaseType" default:"mysql"`
 	SourceHost           string   `json:"sourceHost"`
 	SourcePort           int      `json:"sourcePort"`
 	SourceUser           string   `json:"sourceUser"`
