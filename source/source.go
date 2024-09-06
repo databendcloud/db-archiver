@@ -46,7 +46,7 @@ func SlimCondition(maxThread int, minSplitKey, maxSplitKey int64) [][]int64 {
 	for i := 0; i < maxThread; i++ {
 		lowerBound := minSplitKey + rangeSize*int64(i)
 		upperBound := lowerBound + rangeSize
-		if i == maxThread {
+		if i == maxThread-1 {
 			// Ensure the last condition includes maxSplitKey
 			upperBound = maxSplitKey
 		}
