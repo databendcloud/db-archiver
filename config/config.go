@@ -41,6 +41,7 @@ type Config struct {
 	SourceUser           string   `json:"sourceUser"`
 	SourcePass           string   `json:"sourcePass"`
 	SourceDB             string   `json:"sourceDB"`
+	SSLMode              string   `json:"sslMode"`
 	SourceTable          string   `json:"sourceTable"`
 	SourceDbTables       []string `json:"sourceDbTables"`       // source db tables format: [db1.table1,db2.table2] or [db.*@table.*,mydb.*.table.*]
 	SourceQuery          string   `json:"sourceQuery"`          // select * from table where condition

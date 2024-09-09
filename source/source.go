@@ -15,7 +15,7 @@ import (
 
 type Sourcer interface {
 	AdjustBatchSizeAccordingToSourceDbTable() int64
-	GetSourceReadRowsCount(table, db string) (int, error)
+	GetSourceReadRowsCount() (int, error)
 	GetMinMaxSplitKey() (int64, int64, error)
 	GetMinMaxTimeSplitKey() (string, string, error)
 	DeleteAfterSync() error
@@ -30,8 +30,10 @@ func NewSource(cfg *config.Config) (Sourcer, error) {
 	switch cfg.DatabaseType {
 	case "mysql":
 		return NewMysqlSource(cfg)
-	case "postgresql":
-		return nil, fmt.Errorf("postgresql is not supported yet")
+	case "tidb":
+		return NewMysqlSource(cfg)
+	case "pg":
+		return NewPostgresSource(cfg)
 	default:
 		return NewMysqlSource(cfg)
 	}

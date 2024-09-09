@@ -1,6 +1,13 @@
 # db-archiver
 A simple tool to archive databases to Databend.
 
+## Supported data sources
+|--------------------|-------------------------|
+| MySQL | Yes |
+| PostgreSQL | Yes |
+|TiDB | Yes |
+| Oracle | Coming soon |
+
 
 ## Installation
 ```bash

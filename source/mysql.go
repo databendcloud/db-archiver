@@ -45,7 +45,7 @@ func (s *MysqlSource) AdjustBatchSizeAccordingToSourceDbTable() int64 {
 	if err != nil {
 		return s.cfg.BatchSize
 	}
-	sourceTableRowCount, err := s.GetSourceReadRowsCount(s.cfg.SourceTable, s.cfg.SourceDB)
+	sourceTableRowCount, err := s.GetSourceReadRowsCount()
 	if err != nil {
 		return s.cfg.BatchSize
 	}
@@ -62,9 +62,9 @@ func (s *MysqlSource) AdjustBatchSizeAccordingToSourceDbTable() int64 {
 	}
 }
 
-func (s *MysqlSource) GetSourceReadRowsCount(table, db string) (int, error) {
-	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", db,
-		table, s.cfg.SourceWhereCondition))
+func (s *MysqlSource) GetSourceReadRowsCount() (int, error) {
+	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", s.cfg.SourceDB,
+		s.cfg.SourceTable, s.cfg.SourceWhereCondition))
 	var rowCount int
 	err := row.Scan(&rowCount)
 	if err != nil {
@@ -299,8 +299,10 @@ func (s *MysqlSource) GetAllSourceReadRowsCount() (int, error) {
 		return 0, err
 	}
 	for db, tables := range dbTables {
+		s.cfg.SourceDB = db
 		for _, table := range tables {
-			count, err := s.GetSourceReadRowsCount(table, db)
+			s.cfg.SourceTable = table
+			count, err := s.GetSourceReadRowsCount()
 			if err != nil {
 				return 0, err
 			}

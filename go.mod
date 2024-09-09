@@ -7,6 +7,7 @@ require (
 	github.com/codesuki/go-time-series v0.0.0-20210430055340-c4c8d8fa61d4
 	github.com/datafuselabs/databend-go v0.6.6
 	github.com/go-sql-driver/mysql v1.8.1
+	github.com/lib/pq v1.10.9
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/test-go/testify v1.1.4
