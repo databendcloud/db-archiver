@@ -7,6 +7,8 @@ A simple tool to archive databases to Databend.
 | PostgreSQL | Yes |
 |TiDB | Yes |
 | Oracle | Coming soon |
+| CSV | Coming soon |
+| NDJSON | Coming soon |
 
 
 ## Installation
