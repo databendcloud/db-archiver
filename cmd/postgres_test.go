@@ -23,7 +23,7 @@ func TestMultiplePgTable(t *testing.T) {
 	dsn, tearDown := testutils.PostgresForTest()
 	defer tearDown()
 	preparePgDbxTablex(dsn)
-	prepareDatabend("test_table3", "https://dbarchiver:abc123@tn3ftqihs--medium-p8at.gw.aws-us-east-2.default.databend.com:443")
+	prepareDatabend("test_table3", "http://databend:databend@localhost:8000")
 
 	testConfig := preparePGMultipleConfig()
 	startTime := time.Now()
@@ -135,7 +135,7 @@ func preparePGMultipleConfig() *cfg.Config {
 		SourceQuery:          "select * from mydb2.test_table",
 		SourceSplitKey:       "id",
 		SourceSplitTimeKey:   "",
-		DatabendDSN:          "https://dbarchiver:abc123@tn3ftqihs--medium-p8at.gw.aws-us-east-2.default.databend.com:443",
+		DatabendDSN:          "http://databend:databend@localhost:8000",
 		DatabendTable:        "default.test_table3",
 		BatchSize:            5,
 		BatchMaxInterval:     3,

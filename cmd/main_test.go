@@ -303,7 +303,7 @@ func prepareMultipleConfig() *cfg.Config {
 }
 
 func checkTargetTable(tableName string, target int) error {
-	db, err := sql.Open("databend", "https://dbarchiver:abc123@tn3ftqihs--medium-p8at.gw.aws-us-east-2.default.databend.com:443")
+	db, err := sql.Open("databend", "http://databend:databend@localhost:8000")
 	if err != nil {
 		log.Fatal(err)
 		return err

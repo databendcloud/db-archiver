@@ -84,7 +84,7 @@ func TestPostgresSource_GetDbTablesAccordingToSourceDbTables(t *testing.T) {
 	tables, err := postgresSourceTest.postgresSource.GetDbTablesAccordingToSourceDbTables()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(tables))
-	assert.Equal(t, "test_table", tables["mydb"])
+	assert.Equal(t, []string{"test_table"}, tables["mydb"])
 }
 
 func TestPostgresSource_GetTablesAccordingToSourceTableRegex(t *testing.T) {
@@ -110,7 +110,7 @@ func TestPostgresSource_GetSourceReadRowsCount(t *testing.T) {
 	defer tearDownFunc()
 	count, err := postgresSourceTest.postgresSource.GetSourceReadRowsCount()
 	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+	assert.Equal(t, 2, count)
 }
 
 func TestPostgresSource_GetAllSourceReadRowsCount(t *testing.T) {
@@ -118,7 +118,7 @@ func TestPostgresSource_GetAllSourceReadRowsCount(t *testing.T) {
 	defer tearDownFunc()
 	count, err := postgresSourceTest.postgresSource.GetAllSourceReadRowsCount()
 	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+	assert.Equal(t, 2, count)
 }
 
 func TestPostgresSource_QueryTableData(t *testing.T) {
@@ -126,8 +126,8 @@ func TestPostgresSource_QueryTableData(t *testing.T) {
 	defer tearDownFunc()
 	data, columns, err := postgresSourceTest.postgresSource.QueryTableData(1, "id > 0")
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(data))
-	assert.Equal(t, 2, len(columns))
+	assert.Equal(t, 2, len(data))
+	assert.Equal(t, 3, len(columns))
 	assert.Equal(t, "id", columns[0])
 	assert.Equal(t, "name", columns[1])
 	t.Log(data)
