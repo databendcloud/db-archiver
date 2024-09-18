@@ -5,7 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"log"
+	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -15,33 +18,81 @@ import (
 )
 
 type Source struct {
-	db  *sql.DB
-	cfg *config.Config
+	db            *sql.DB
+	cfg           *config.Config
+	statsRecorder *DatabendSourceStatsRecorder
 }
 
 type Sourcer interface {
-	QueryTableData(conditionSql string) ([][]interface{}, []string, error)
+	QueryTableData(threadNum int, conditionSql string) ([][]interface{}, []string, error)
 }
 
 func NewSource(cfg *config.Config) (*Source, error) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+	stats := NewDatabendIntesterStatsRecorder()
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/mysql",
 		cfg.SourceUser,
 		cfg.SourcePass,
 		cfg.SourceHost,
-		cfg.SourcePort,
-		cfg.SourceDB))
+		cfg.SourcePort))
 	if err != nil {
+		logrus.Errorf("failed to open db: %v", err)
 		return nil, err
 	}
+	//fmt.Printf("connected to mysql successfully %v", cfg)
 	return &Source{
-		db:  db,
-		cfg: cfg,
+		db:            db,
+		cfg:           cfg,
+		statsRecorder: stats,
 	}, nil
 }
 
-func (s *Source) GetSourceReadRowsCount() (int, error) {
-	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", s.cfg.SourceDB,
-		s.cfg.SourceTable, s.cfg.SourceWhereCondition))
+// AdjustBatchSizeAccordingToSourceDbTable has a concept called s,  s = (maxKey - minKey) / sourceTableRowCount
+// if s == 1 it means the data is uniform in the table, if s is much bigger than 1, it means the data is not uniform in the table
+func (s *Source) AdjustBatchSizeAccordingToSourceDbTable() int64 {
+	minSplitKey, maxSplitKey, err := s.GetMinMaxSplitKey()
+	if err != nil {
+		return s.cfg.BatchSize
+	}
+	sourceTableRowCount, err := s.GetSourceReadRowsCount(s.cfg.SourceTable, s.cfg.SourceDB)
+	if err != nil {
+		return s.cfg.BatchSize
+	}
+	rangeSize := maxSplitKey - minSplitKey
+	switch {
+	case int64(sourceTableRowCount) <= s.cfg.BatchSize:
+		return rangeSize
+	case rangeSize/int64(sourceTableRowCount) >= 10:
+		return s.cfg.BatchSize * 5
+	case rangeSize/int64(sourceTableRowCount) >= 100:
+		return s.cfg.BatchSize * 20
+	default:
+		return s.cfg.BatchSize
+	}
+}
+
+func (s *Source) GetAllSourceReadRowsCount() (int, error) {
+	allCount := 0
+
+	dbTables, err := s.GetDbTablesAccordingToSourceDbTables()
+	if err != nil {
+		return 0, err
+	}
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			count, err := s.GetSourceReadRowsCount(table, db)
+			if err != nil {
+				return 0, err
+			}
+			allCount += count
+		}
+	}
+
+	return allCount, nil
+}
+
+func (s *Source) GetSourceReadRowsCount(table, db string) (int, error) {
+	row := s.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", db,
+		table, s.cfg.SourceWhereCondition))
 	var rowCount int
 	err := row.Scan(&rowCount)
 	if err != nil {
@@ -51,19 +102,7 @@ func (s *Source) GetSourceReadRowsCount() (int, error) {
 	return rowCount, nil
 }
 
-func (s *Source) GetRowsCountByConditionSql(conditionSql string) (int, error) {
-	rowCountQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s WHERE %s", s.cfg.SourceDB, s.cfg.SourceTable, conditionSql)
-	row := s.db.QueryRow(rowCountQuery)
-	var rowCount int
-	err := row.Scan(&rowCount)
-	if err != nil {
-		return 0, err
-	}
-
-	return rowCount, nil
-}
-
-func (s *Source) GetMinMaxSplitKey() (int, int, error) {
+func (s *Source) GetMinMaxSplitKey() (int64, int64, error) {
 	rows, err := s.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", s.cfg.SourceSplitKey,
 		s.cfg.SourceSplitKey, s.cfg.SourceDB, s.cfg.SourceTable, s.cfg.SourceWhereCondition))
 	if err != nil {
@@ -71,14 +110,20 @@ func (s *Source) GetMinMaxSplitKey() (int, int, error) {
 	}
 	defer rows.Close()
 
-	var minSplitKey, maxSplitKey int
+	var minSplitKey, maxSplitKey sql.NullInt64
 	for rows.Next() {
 		err = rows.Scan(&minSplitKey, &maxSplitKey)
 		if err != nil {
 			return 0, 0, err
 		}
 	}
-	return minSplitKey, maxSplitKey, nil
+
+	// Check if minSplitKey and maxSplitKey are valid (not NULL)
+	if !minSplitKey.Valid || !maxSplitKey.Valid {
+		return 0, 0, nil
+	}
+
+	return minSplitKey.Int64, maxSplitKey.Int64, nil
 }
 
 func (s *Source) GetMinMaxTimeSplitKey() (string, string, error) {
@@ -99,20 +144,20 @@ func (s *Source) GetMinMaxTimeSplitKey() (string, string, error) {
 	return minSplitKey, maxSplitKey, nil
 }
 
-func (s *Source) SlimCondition(minSplitKey, maxSplitKey int) [][]int {
-	var conditions [][]int
+func (s *Source) SlimCondition(minSplitKey, maxSplitKey int64) [][]int64 {
+	var conditions [][]int64
 	if minSplitKey > maxSplitKey {
 		return conditions
 	}
-	rangeSize := (maxSplitKey - minSplitKey) / s.cfg.MaxThread
+	rangeSize := (maxSplitKey - minSplitKey) / int64(s.cfg.MaxThread)
 	for i := 0; i < s.cfg.MaxThread; i++ {
-		lowerBound := minSplitKey + rangeSize*i
+		lowerBound := minSplitKey + rangeSize*int64(i)
 		upperBound := lowerBound + rangeSize
 		if i == s.cfg.MaxThread-1 {
 			// Ensure the last condition includes maxSplitKey
 			upperBound = maxSplitKey
 		}
-		conditions = append(conditions, []int{lowerBound, upperBound})
+		conditions = append(conditions, []int64{lowerBound, upperBound})
 	}
 	return conditions
 }
@@ -128,7 +173,8 @@ func (s *Source) DeleteAfterSync() error {
 	return nil
 }
 
-func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string, error) {
+func (s *Source) QueryTableData(threadNum int, conditionSql string) ([][]interface{}, []string, error) {
+	startTime := time.Now()
 	execSql := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s", s.cfg.SourceDB,
 		s.cfg.SourceTable, conditionSql)
 	if s.cfg.SourceWhereCondition != "" && s.cfg.SourceSplitKey != "" {
@@ -153,17 +199,19 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 	for i, columnType := range columnTypes {
 		switch columnType.DatabaseTypeName() {
 		case "INT", "SMALLINT", "TINYINT", "MEDIUMINT", "BIGINT":
-			scanArgs[i] = new(int)
+			scanArgs[i] = new(sql.NullInt64)
+		case "UNSIGNED INT", "UNSIGNED TINYINT", "UNSIGNED MEDIUMINT", "UNSIGNED BIGINT":
+			scanArgs[i] = new(sql.NullInt64)
 		case "FLOAT", "DOUBLE":
-			scanArgs[i] = new(float64)
+			scanArgs[i] = new(sql.NullFloat64)
 		case "DECIMAL":
 			scanArgs[i] = new(sql.NullFloat64)
 		case "CHAR", "VARCHAR", "TEXT", "TINYTEXT", "MEDIUMTEXT", "LONGTEXT":
-			scanArgs[i] = new(string)
+			scanArgs[i] = new(sql.NullString)
 		case "DATE", "TIME", "DATETIME", "TIMESTAMP":
-			scanArgs[i] = new(string) // or use time.Time
+			scanArgs[i] = new(sql.NullString) // or use time.Time
 		case "BOOL", "BOOLEAN":
-			scanArgs[i] = new(bool)
+			scanArgs[i] = new(sql.NullBool)
 		default:
 			scanArgs[i] = new(sql.RawBytes)
 		}
@@ -188,7 +236,33 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 				row[i] = *v
 			case *string:
 				row[i] = *v
+			case *sql.NullString:
+				if v.Valid {
+					row[i] = v.String
+				} else {
+					row[i] = nil
+				}
 			case *bool:
+				row[i] = *v
+			case *sql.NullInt64:
+				if v.Valid {
+					row[i] = v.Int64
+				} else {
+					row[i] = nil
+				}
+			case *sql.NullFloat64:
+				if v.Valid {
+					row[i] = v.Float64
+				} else {
+					row[i] = nil
+				}
+			case *sql.NullBool:
+				if v.Valid {
+					row[i] = v.Bool
+				} else {
+					row[i] = nil
+				}
+			case *float64:
 				row[i] = *v
 			case *sql.RawBytes:
 				row[i] = string(*v)
@@ -200,11 +274,14 @@ func (s *Source) QueryTableData(conditionSql string) ([][]interface{}, []string,
 	if err = rows.Err(); err != nil {
 		return nil, nil, err
 	}
+	s.statsRecorder.RecordMetric(len(result))
+	stats := s.statsRecorder.Stats(time.Since(startTime))
+	log.Printf("thread-%d: extract %d rows (%f rows/s)", threadNum, len(result), stats.RowsPerSecondd)
 
 	return result, columns, nil
 }
 
-func (s *Source) SplitCondition(minSplitKey, maxSplitKey int) []string {
+func (s *Source) SplitCondition(minSplitKey, maxSplitKey int64) []string {
 	var conditions []string
 	for {
 		if minSplitKey >= maxSplitKey {
@@ -217,31 +294,37 @@ func (s *Source) SplitCondition(minSplitKey, maxSplitKey int) []string {
 	return conditions
 }
 
-func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, allMax int) []string {
-	var conditions []string
-	if minSplitKey > maxSplitKey {
-		return conditions
-	}
+func (s *Source) SplitConditionAccordingMaxGoRoutine(minSplitKey, maxSplitKey, allMax int64) <-chan string {
+	conditions := make(chan string, 100) // make a buffered channel
 
-	for {
-		if (minSplitKey + s.cfg.BatchSize - 1) >= maxSplitKey {
-			if minSplitKey > allMax {
-				return conditions
-			}
-			if maxSplitKey == allMax {
-				conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey))
-			} else {
-				conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey))
-			}
-			break
+	go func() {
+		defer close(conditions) // make sure close channel
+
+		if minSplitKey > maxSplitKey {
+			return
 		}
-		if (minSplitKey + s.cfg.BatchSize - 1) >= allMax {
-			conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, allMax))
-			return conditions
+
+		for {
+			if (minSplitKey + s.cfg.BatchSize - 1) >= maxSplitKey {
+				if minSplitKey > allMax {
+					return
+				}
+				if maxSplitKey == allMax {
+					conditions <- fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey)
+				} else {
+					conditions <- fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, maxSplitKey)
+				}
+				break
+			}
+			if (minSplitKey + s.cfg.BatchSize - 1) >= allMax {
+				conditions <- fmt.Sprintf("(%s >= %d and %s <= %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, allMax)
+				return
+			}
+			conditions <- fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, minSplitKey+s.cfg.BatchSize-1)
+			minSplitKey += s.cfg.BatchSize - 1
 		}
-		conditions = append(conditions, fmt.Sprintf("(%s >= %d and %s < %d)", s.cfg.SourceSplitKey, minSplitKey, s.cfg.SourceSplitKey, minSplitKey+s.cfg.BatchSize-1))
-		minSplitKey += s.cfg.BatchSize - 1
-	}
+	}()
+
 	return conditions
 }
 
@@ -296,6 +379,84 @@ func (s *Source) SplitConditionAccordingToTimeSplitKey(minTimeSplitKey, maxTimeS
 	return conditions, nil
 }
 
+func (s *Source) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern string) ([]string, error) {
+	rows, err := s.db.Query("SHOW DATABASES")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var databases []string
+	for rows.Next() {
+		var database string
+		err = rows.Scan(&database)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println("sourcedatabase pattern", sourceDatabasePattern)
+		match, err := regexp.MatchString(sourceDatabasePattern, database)
+		if err != nil {
+			return nil, err
+		}
+		if match {
+			fmt.Println("match db: ", database)
+			databases = append(databases, database)
+		}
+	}
+	return databases, nil
+}
+
+func (s *Source) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
+	dbTables := make(map[string][]string)
+	for _, database := range databases {
+		rows, err := s.db.Query(fmt.Sprintf("SHOW TABLES FROM %s", database))
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		var tables []string
+		for rows.Next() {
+			var table string
+			err = rows.Scan(&table)
+			if err != nil {
+				return nil, err
+			}
+			match, err := regexp.MatchString(sourceTablePattern, table)
+			if err != nil {
+				return nil, err
+			}
+			if match {
+				tables = append(tables, table)
+			}
+		}
+		dbTables[database] = tables
+	}
+	return dbTables, nil
+}
+
+func (s *Source) GetDbTablesAccordingToSourceDbTables() (map[string][]string, error) {
+	allDbTables := make(map[string][]string)
+	for _, sourceDbTable := range s.cfg.SourceDbTables {
+		dbTable := strings.Split(sourceDbTable, "@") // because `.` in regex is a special character, so use `@` to split
+		if len(dbTable) != 2 {
+			return nil, fmt.Errorf("invalid sourceDbTable: %s, should be a.b format", sourceDbTable)
+		}
+		dbs, err := s.GetDatabasesAccordingToSourceDbRegex(dbTable[0])
+		if err != nil {
+			return nil, fmt.Errorf("get databases according to sourceDbRegex failed: %v", err)
+		}
+		dbTables, err := s.GetTablesAccordingToSourceTableRegex(dbTable[1], dbs)
+		if err != nil {
+			return nil, fmt.Errorf("get tables according to sourceTableRegex failed: %v", err)
+		}
+		for db, tables := range dbTables {
+			allDbTables[db] = append(allDbTables[db], tables...)
+		}
+	}
+	return allDbTables, nil
+}
+
 func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, error) {
 	l := logrus.WithFields(logrus.Fields{"tardatabend": "IngestData"})
 	var batchJsonData []string
@@ -324,7 +485,8 @@ func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, erro
 }
 
 func generateNDJsonFile(batchJsonData []string) (string, int, error) {
-	outputFile, err := ioutil.TempFile("/tmp", "databend-ingest-*.ndjson")
+	fileName := fmt.Sprintf("databend-ingest-%d.ndjson", time.Now().UnixNano())
+	outputFile, err := os.CreateTemp("/tmp", fileName)
 	if err != nil {
 		return "", 0, err
 	}

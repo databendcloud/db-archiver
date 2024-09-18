@@ -20,6 +20,14 @@ jobs:
         ports:
           - 8000:8000
           - 9000:9000
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: 123456
+          MYSQL_DATABASE: default
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=10
 
     steps:
       - name: Checkout
@@ -32,7 +40,6 @@ jobs:
 
       - name: Test
         env:
-          TEST_DATABEND_DSN: "http://databend:databend@localhost:8000/default"
-          TEST_KAFKA_BROKER: "localhost:9092"
+          TEST_DATABEND_DSN: "http://databend:databend@localhost:8000"
         run: |
           go test -v -p 1 -cover ./...

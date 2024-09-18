@@ -8,9 +8,10 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/databendcloud/db-archiver/config"
 	"github.com/databendcloud/db-archiver/ingester"
@@ -49,14 +50,69 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	w := worker.NewWorker(cfg, fmt.Sprintf("worker"), ig, src)
-	go func() {
-		w.Run(ctx)
-		wg.Done()
-	}()
-	wg.Wait()
+
+	dbTables := make(map[string][]string)
+	if len(cfg.SourceDbTables) != 0 {
+		dbTables, err = src.GetDbTablesAccordingToSourceDbTables()
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		dbs, err := src.GetDatabasesAccordingToSourceDbRegex(cfg.SourceDB)
+		if err != nil {
+			panic(err)
+		}
+		dbTables, err = src.GetTablesAccordingToSourceTableRegex(cfg.SourceTable, dbs)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	w := &worker.Worker{Cfg: cfg, Ig: ig, Src: src, Name: "dbarchiver"}
+	syncedCount, err := w.Ig.GetAllSyncedCount()
+	if err != nil || syncedCount != 0 {
+		if syncedCount != 0 {
+			logrus.Errorf("syncedCount is not 0, already ingested %d rows", syncedCount)
+			return
+		}
+		logrus.Errorf("pre-check failed: %v", err)
+		return
+	}
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			logrus.Infof("Start worker %s.%s", db, table)
+			db := db
+			table := table
+			cfgCopy := *cfg
+			cfgCopy.SourceDB = db
+			cfgCopy.SourceTable = table
+			ig := ingester.NewDatabendIngester(&cfgCopy)
+			src, err := source.NewSource(&cfgCopy)
+			if err != nil {
+				panic(err)
+			}
+			// adjust batch size according to source db table
+			cfgCopy.BatchSize = src.AdjustBatchSizeAccordingToSourceDbTable()
+			w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
+			w.Run(ctx)
+		}
+	}
+	targetCount, sourceCount, workerCorrect := w.IsWorkerCorrect()
+
+	if workerCorrect {
+		logrus.Infof("Worker %s finished and data correct, source data count is %d,"+
+			" target data count is %d", w.Name, sourceCount, targetCount)
+	} else {
+		logrus.Errorf("Worker %s finished and data incorrect, source data count is %d,"+
+			" but databend data count is %d", w.Name, sourceCount, targetCount)
+	}
+
+	if w.Cfg.DeleteAfterSync && workerCorrect {
+		err := w.Src.DeleteAfterSync()
+		if err != nil {
+			logrus.Errorf("DeleteAfterSync failed: %v, please do it mannually", err)
+		}
+	}
 	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(endTime)
 	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
