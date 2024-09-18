@@ -15,7 +15,7 @@ type postgresSourceTest struct {
 	postgresSource PostgresSource
 }
 
-var postgresPort = 15434
+var postgresPort = 15432
 
 func setupPostgresSourceTest() (*postgresSourceTest, func()) {
 	pgDsn, tearDownFunc := testutils.PostgresForTest()
