@@ -49,7 +49,7 @@ func (s *MysqlSource) AdjustBatchSizeAccordingToSourceDbTable() int64 {
 	if err != nil {
 		return s.cfg.BatchSize
 	}
-	rangeSize := maxSplitKey - minSplitKey
+	rangeSize := maxSplitKey - minSplitKey + 1
 	switch {
 	case int64(sourceTableRowCount) <= s.cfg.BatchSize:
 		return rangeSize

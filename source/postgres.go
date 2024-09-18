@@ -29,7 +29,7 @@ func (p PostgresSource) AdjustBatchSizeAccordingToSourceDbTable() int64 {
 	if err != nil {
 		return p.cfg.BatchSize
 	}
-	rangeSize := maxSplitKey - minSplitKey
+	rangeSize := maxSplitKey - minSplitKey + 1
 	switch {
 	case int64(sourceTableRowCount) <= p.cfg.BatchSize:
 		return rangeSize
@@ -51,7 +51,7 @@ func NewPostgresSource(cfg *config.Config) (*PostgresSource, error) {
 	if cfg.SSLMode == "" {
 		cfg.SSLMode = "disable"
 	}
-	db, err := sql.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s:%d/pqgotest?sslmode=%s",
+	db, err := sql.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s:%d/postgres?sslmode=%s",
 		cfg.SourceUser,
 		cfg.SourcePass,
 		cfg.SourceHost,
@@ -96,7 +96,7 @@ func (p PostgresSource) GetSourceReadRowsCount() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	row := p.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s", p.cfg.SourceDB,
+	row := p.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s WHERE %s",
 		p.cfg.SourceTable, p.cfg.SourceWhereCondition))
 	var rowCount int
 	err = row.Scan(&rowCount)
@@ -200,14 +200,15 @@ func (p PostgresSource) QueryTableData(threadNum int, conditionSql string) ([][]
 
 	scanArgs := make([]interface{}, len(columns))
 	for i, columnType := range columnTypes {
+		fmt.Printf("%s\n", columnType.DatabaseTypeName())
 		switch columnType.DatabaseTypeName() {
-		case "INT", "SMALLINT", "TINYINT", "MEDIUMINT", "BIGINT":
+		case "INT", "SMALLINT", "TINYINT", "MEDIUMINT", "BIGINT", "INT4", "INT8":
 			scanArgs[i] = new(sql.NullInt64)
 		case "UNSIGNED INT", "UNSIGNED TINYINT", "UNSIGNED MEDIUMINT", "UNSIGNED BIGINT":
 			scanArgs[i] = new(sql.NullInt64)
-		case "FLOAT", "DOUBLE":
+		case "FLOAT", "DOUBLE", "FLOAT8":
 			scanArgs[i] = new(sql.NullFloat64)
-		case "DECIMAL":
+		case "DECIMAL", "NUMERIC":
 			scanArgs[i] = new(sql.NullFloat64)
 		case "CHAR", "VARCHAR", "TEXT", "TINYTEXT", "MEDIUMTEXT", "LONGTEXT":
 			scanArgs[i] = new(sql.NullString)
@@ -261,7 +262,12 @@ func (p PostgresSource) QueryTableData(threadNum int, conditionSql string) ([][]
 				}
 			case *sql.NullBool:
 				if v.Valid {
-					row[i] = v.Bool
+					//row[i] = v.Bool
+					if v.Bool {
+						row[i] = 1
+					} else {
+						row[i] = 0
+					}
 				} else {
 					row[i] = nil
 				}
