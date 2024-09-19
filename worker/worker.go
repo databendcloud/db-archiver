@@ -19,7 +19,7 @@ type Worker struct {
 	Name          string
 	Cfg           *config.Config
 	Ig            ingester.DatabendIngester
-	Src           *source.Source
+	Src           source.Sourcer
 	statsRecorder *DatabendWorkerStatsRecorder
 }
 
@@ -28,7 +28,7 @@ var (
 	AlreadyIngestBytes = 0
 )
 
-func NewWorker(cfg *config.Config, name string, ig ingester.DatabendIngester, src *source.Source) *Worker {
+func NewWorker(cfg *config.Config, name string, ig ingester.DatabendIngester, src source.Sourcer) *Worker {
 	stats := NewDatabendWorkerStatsRecorder()
 	cfg.SourceQuery = fmt.Sprintf("select * from %s.%s", cfg.SourceDB, cfg.SourceTable)
 
@@ -96,13 +96,13 @@ func (w *Worker) stepBatch() error {
 
 	if w.IsSplitAccordingMaxGoRoutine(minSplitKey, maxSplitKey, w.Cfg.BatchSize) {
 		fmt.Println("split according maxGoRoutine", w.Cfg.MaxThread)
-		slimedRange := w.Src.SlimCondition(minSplitKey, maxSplitKey)
+		slimedRange := source.SlimCondition(w.Cfg.MaxThread, minSplitKey, maxSplitKey)
 		fmt.Println("slimedRange", slimedRange)
 		wg.Add(w.Cfg.MaxThread)
 		for i := 0; i < w.Cfg.MaxThread; i++ {
 			go func(idx int) {
 				defer wg.Done()
-				conditions := w.Src.SplitConditionAccordingMaxGoRoutine(slimedRange[idx][0], slimedRange[idx][1], maxSplitKey)
+				conditions := source.SplitConditionAccordingMaxGoRoutine(w.Cfg.SourceSplitKey, w.Cfg.BatchSize, slimedRange[idx][0], slimedRange[idx][1], maxSplitKey)
 				logrus.Infof("conditions in one routine: %v", len(conditions))
 				if err != nil {
 					logrus.Errorf("stepBatchWithCondition failed: %v", err)
@@ -119,7 +119,7 @@ func (w *Worker) stepBatch() error {
 		wg.Wait()
 		return nil
 	}
-	conditions := w.Src.SplitCondition(minSplitKey, maxSplitKey)
+	conditions := source.SplitCondition(w.Cfg.SourceSplitKey, w.Cfg.BatchSize, minSplitKey, maxSplitKey)
 	for _, condition := range conditions {
 		wg.Add(1)
 		go func(condition string) {
@@ -143,13 +143,13 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 	fmt.Println("minSplitKey", minSplitKey, "maxSplitKey", maxSplitKey)
 
 	fmt.Println("split according time split key", w.Cfg.MaxThread)
-	allConditions, err := w.Src.SplitConditionAccordingToTimeSplitKey(minSplitKey, maxSplitKey)
+	allConditions, err := source.SplitConditionAccordingToTimeSplitKey(w.Cfg, minSplitKey, maxSplitKey)
 	if err != nil {
 		return err
 	}
 	fmt.Println("allConditions: ", len(allConditions))
 	fmt.Println("all split conditions", allConditions)
-	slimedRange := w.Src.SplitTimeConditionsByMaxThread(allConditions, w.Cfg.MaxThread)
+	slimedRange := source.SplitTimeConditionsByMaxThread(allConditions, w.Cfg.MaxThread)
 	fmt.Println(len(slimedRange))
 	fmt.Println("slimedRange", slimedRange)
 	wg.Add(w.Cfg.MaxThread)

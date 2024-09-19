@@ -23,7 +23,7 @@ import (
 func TestMultipleDbTablesWorkflow(t *testing.T) {
 
 	prepareDbxTablex()
-	prepareDatabend("test_table2")
+	prepareDatabend("test_table2", "http://databend:databend@localhost:8000")
 
 	testConfig := prepareMultipleConfig()
 	startTime := time.Now()
@@ -55,7 +55,7 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 
 func TestWorkFlow(t *testing.T) {
 	prepareMysql()
-	prepareDatabend("test_table")
+	prepareDatabend("test_table", "http://databend:databend@localhost:8000")
 	testConfig := prepareTestConfig()
 	startTime := time.Now()
 
@@ -221,8 +221,8 @@ func prepareMysql() {
 	}
 }
 
-func prepareDatabend(tableName string) {
-	db, err := sql.Open("databend", "http://databend:databend@localhost:8000")
+func prepareDatabend(tableName string, dsn string) {
+	db, err := sql.Open("databend", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
