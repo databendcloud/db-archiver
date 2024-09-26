@@ -15,7 +15,7 @@ type DatabendWorkerStatsRecorder struct {
 
 type DatabendWorkerStatsData struct {
 	BytesPerSecond float64
-	RowsPerSecondd float64
+	RowsPerSecond  float64
 }
 
 func NewDatabendWorkerStatsRecorder() *DatabendWorkerStatsRecorder {
@@ -48,7 +48,7 @@ func (stats *DatabendWorkerStatsRecorder) Stats(statsWindow time.Duration) Datab
 	rowsPerSecond := stats.calcPerSecond(stats.ingestedRows, statsWindow)
 	return DatabendWorkerStatsData{
 		BytesPerSecond: bytesPerSecond,
-		RowsPerSecondd: rowsPerSecond,
+		RowsPerSecond:  rowsPerSecond,
 	}
 }
 
