@@ -12,15 +12,16 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/databendcloud/db-archiver/config"
+	_ "github.com/godror/godror"
 )
 
-type PostgresSource struct {
+type OracleSource struct {
 	db            *sql.DB
 	cfg           *config.Config
 	statsRecorder *DatabendSourceStatsRecorder
 }
 
-func (p *PostgresSource) AdjustBatchSizeAccordingToSourceDbTable() int64 {
+func (p *OracleSource) AdjustBatchSizeAccordingToSourceDbTable() int64 {
 	minSplitKey, maxSplitKey, err := p.GetMinMaxSplitKey()
 	if err != nil {
 		return p.cfg.BatchSize
@@ -42,7 +43,7 @@ func (p *PostgresSource) AdjustBatchSizeAccordingToSourceDbTable() int64 {
 	}
 }
 
-func NewPostgresSource(cfg *config.Config) (*PostgresSource, error) {
+func NewOracleSource(cfg *config.Config) (*OracleSource, error) {
 	stats := NewDatabendIntesterStatsRecorder()
 	// disable - No SSL
 	//require - Always SSL (skip verification)
@@ -51,24 +52,29 @@ func NewPostgresSource(cfg *config.Config) (*PostgresSource, error) {
 	if cfg.SSLMode == "" {
 		cfg.SSLMode = "disable"
 	}
-	db, err := sql.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s:%d/postgres?sslmode=%s",
+	db, err := sql.Open("godror", fmt.Sprintf("oracle://%s:%s@%s:%d/XE?service_name=%s?sslmode=%s",
 		cfg.SourceUser,
 		cfg.SourcePass,
 		cfg.SourceHost,
 		cfg.SourcePort,
 		cfg.SSLMode))
 	if err != nil {
-		logrus.Errorf("failed to open postgres db: %v", err)
+		logrus.Errorf("failed to open oracle db: %v", err)
 		return nil, err
 	}
-	return &PostgresSource{
+	// 测试连接
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return &OracleSource{
 		db:            db,
 		cfg:           cfg,
 		statsRecorder: stats,
 	}, nil
 }
 
-func (p *PostgresSource) SwitchDatabase() error {
+func (p *OracleSource) SwitchDatabase() error {
 	// Close the current connection
 	err := p.db.Close()
 	if err != nil {
@@ -76,7 +82,8 @@ func (p *PostgresSource) SwitchDatabase() error {
 	}
 
 	// Open a new connection to the new database
-	db, err := sql.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+	// oracle://a:123@0.0.0.0:49161/XE
+	db, err := sql.Open("godror", fmt.Sprintf("oracle://%s:%s@%s:%d/XE?service_name=%s?sslmode=%s",
 		p.cfg.SourceUser,
 		p.cfg.SourcePass,
 		p.cfg.SourceHost,
@@ -91,29 +98,28 @@ func (p *PostgresSource) SwitchDatabase() error {
 	p.db = db
 	return nil
 }
-func (p *PostgresSource) GetSourceReadRowsCount() (int, error) {
+func (p *OracleSource) GetSourceReadRowsCount() (int, error) {
 	err := p.SwitchDatabase()
 	if err != nil {
 		return 0, err
 	}
-	row := p.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s WHERE %s",
-		p.cfg.SourceTable, p.cfg.SourceWhereCondition))
+	row := p.db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s.%s WHERE %s",
+		p.cfg.SourceDB, p.cfg.SourceTable, p.cfg.SourceWhereCondition))
 	var rowCount int
 	err = row.Scan(&rowCount)
 	if err != nil {
 		return 0, err
 	}
-
 	return rowCount, nil
 }
 
-func (p *PostgresSource) GetMinMaxSplitKey() (int64, int64, error) {
+func (p *OracleSource) GetMinMaxSplitKey() (int64, int64, error) {
 	err := p.SwitchDatabase()
 	if err != nil {
 		return 0, 0, err
 	}
-	rows, err := p.db.Query(fmt.Sprintf("select COALESCE(min(%s),0), COALESCE(max(%s),0) from %s WHERE %s",
-		p.cfg.SourceSplitKey, p.cfg.SourceSplitKey, p.cfg.SourceTable, p.cfg.SourceWhereCondition))
+	rows, err := p.db.Query(fmt.Sprintf("select COALESCE(min(%s),0), COALESCE(max(%s),0) from %s.%s WHERE %s",
+		p.cfg.SourceSplitKey, p.cfg.SourceSplitKey, p.cfg.SourceDB, p.cfg.SourceTable, p.cfg.SourceWhereCondition))
 	if err != nil {
 		return 0, 0, err
 	}
@@ -135,13 +141,13 @@ func (p *PostgresSource) GetMinMaxSplitKey() (int64, int64, error) {
 	return minSplitKey.Int64, maxSplitKey.Int64, nil
 }
 
-func (p *PostgresSource) GetMinMaxTimeSplitKey() (string, string, error) {
+func (p *OracleSource) GetMinMaxTimeSplitKey() (string, string, error) {
 	err := p.SwitchDatabase()
 	if err != nil {
 		return "", "", err
 	}
-	rows, err := p.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s WHERE %s", p.cfg.SourceSplitTimeKey,
-		p.cfg.SourceSplitTimeKey, p.cfg.SourceTable, p.cfg.SourceWhereCondition))
+	rows, err := p.db.Query(fmt.Sprintf("select min(%s), max(%s) from %s.%s WHERE %s", p.cfg.SourceSplitTimeKey,
+		p.cfg.SourceSplitTimeKey, p.cfg.SourceDB, p.cfg.SourceTable, p.cfg.SourceWhereCondition))
 	if err != nil {
 		return "", "", err
 	}
@@ -157,14 +163,14 @@ func (p *PostgresSource) GetMinMaxTimeSplitKey() (string, string, error) {
 	return minSplitKey, maxSplitKey, nil
 }
 
-func (p *PostgresSource) DeleteAfterSync() error {
+func (p *OracleSource) DeleteAfterSync() error {
 	err := p.SwitchDatabase()
 	if err != nil {
 		return err
 	}
 	if p.cfg.DeleteAfterSync {
-		_, err := p.db.Exec(fmt.Sprintf("delete from %s where %s",
-			p.cfg.SourceTable, p.cfg.SourceWhereCondition))
+		_, err := p.db.Exec(fmt.Sprintf("delete from %s.%s where %s",
+			p.cfg.SourceDB, p.cfg.SourceTable, p.cfg.SourceWhereCondition))
 		if err != nil {
 			return err
 		}
@@ -172,14 +178,14 @@ func (p *PostgresSource) DeleteAfterSync() error {
 	return nil
 }
 
-func (p *PostgresSource) QueryTableData(threadNum int, conditionSql string) ([][]interface{}, []string, error) {
+func (p *OracleSource) QueryTableData(threadNum int, conditionSql string) ([][]interface{}, []string, error) {
 	startTime := time.Now()
 	err := p.SwitchDatabase()
 	if err != nil {
 		return nil, nil, err
 	}
-	execSql := fmt.Sprintf("SELECT * FROM %s WHERE %s",
-		p.cfg.SourceTable, conditionSql)
+	execSql := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s",
+		p.cfg.SourceDB, p.cfg.SourceTable, conditionSql)
 	if p.cfg.SourceWhereCondition != "" && p.cfg.SourceSplitKey != "" {
 		execSql = fmt.Sprintf("%s AND %s", execSql, p.cfg.SourceWhereCondition)
 	}
@@ -200,9 +206,8 @@ func (p *PostgresSource) QueryTableData(threadNum int, conditionSql string) ([][
 
 	scanArgs := make([]interface{}, len(columns))
 	for i, columnType := range columnTypes {
-		fmt.Printf("%s\n", columnType.DatabaseTypeName())
 		switch columnType.DatabaseTypeName() {
-		case "INT", "SMALLINT", "TINYINT", "MEDIUMINT", "BIGINT", "INT4", "INT8":
+		case "INT", "SMALLINT", "TINYINT", "MEDIUMINT", "BIGINT", "INT4", "INT8", "NUMBER":
 			scanArgs[i] = new(sql.NullInt64)
 		case "UNSIGNED INT", "UNSIGNED TINYINT", "UNSIGNED MEDIUMINT", "UNSIGNED BIGINT":
 			scanArgs[i] = new(sql.NullInt64)
@@ -210,7 +215,7 @@ func (p *PostgresSource) QueryTableData(threadNum int, conditionSql string) ([][
 			scanArgs[i] = new(sql.NullFloat64)
 		case "DECIMAL", "NUMERIC":
 			scanArgs[i] = new(sql.NullFloat64)
-		case "CHAR", "VARCHAR", "TEXT", "TINYTEXT", "MEDIUMTEXT", "LONGTEXT":
+		case "CHAR", "VARCHAR", "VARCHAR2", "TEXT", "TINYTEXT", "MEDIUMTEXT", "LONGTEXT":
 			scanArgs[i] = new(sql.NullString)
 		case "DATE", "TIME", "DATETIME", "TIMESTAMP":
 			scanArgs[i] = new(sql.NullString) // or use time.Time
@@ -290,8 +295,8 @@ func (p *PostgresSource) QueryTableData(threadNum int, conditionSql string) ([][
 	return result, columns, nil
 }
 
-func (p *PostgresSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern string) ([]string, error) {
-	rows, err := p.db.Query("SELECT datname FROM pg_database")
+func (p *OracleSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern string) ([]string, error) {
+	rows, err := p.db.Query("SELECT username AS schema_name FROM all_users")
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +320,7 @@ func (p *PostgresSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePatt
 	return databases, nil
 }
 
-func (p *PostgresSource) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
+func (p *OracleSource) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
 	dbTables := make(map[string][]string)
 	for _, database := range databases {
 		p.cfg.SourceDB = database
@@ -323,7 +328,7 @@ func (p *PostgresSource) GetTablesAccordingToSourceTableRegex(sourceTablePattern
 		if err != nil {
 			return nil, err
 		}
-		rows, err := p.db.Query(fmt.Sprintf("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema'"))
+		rows, err := p.db.Query(fmt.Sprintf("SELECT table_name FROM ALL_TABLES WHERE OWNER = '%s'", database))
 		if err != nil {
 			return nil, err
 		}
@@ -349,7 +354,7 @@ func (p *PostgresSource) GetTablesAccordingToSourceTableRegex(sourceTablePattern
 	return dbTables, nil
 }
 
-func (p *PostgresSource) GetAllSourceReadRowsCount() (int, error) {
+func (p *OracleSource) GetAllSourceReadRowsCount() (int, error) {
 	allCount := 0
 
 	dbTables, err := p.GetDbTablesAccordingToSourceDbTables()
@@ -371,7 +376,7 @@ func (p *PostgresSource) GetAllSourceReadRowsCount() (int, error) {
 	return allCount, nil
 }
 
-func (p *PostgresSource) GetDbTablesAccordingToSourceDbTables() (map[string][]string, error) {
+func (p *OracleSource) GetDbTablesAccordingToSourceDbTables() (map[string][]string, error) {
 	allDbTables := make(map[string][]string)
 	for _, sourceDbTable := range p.cfg.SourceDbTables {
 		dbTable := strings.Split(sourceDbTable, "@") // because `.` in regex is a special character, so use `@` to split
