@@ -1,0 +1,21 @@
+{
+  "databaseType": "oracle",
+  "sourceHost": "127.0.0.1",
+  "sourcePort": 49161,
+  "sourceUser": "a",
+  "sourcePass": "123",
+  "sourceDbTables": ["MYDB.*@TEST_TABLE.*"],
+  "sourceQuery":          "select * from mydb2.test_table",
+  "sourceWhereCondition": "id > 0",
+  "sourceSplitKey": "id",
+  "sourceSplitTimeKey": "",
+  "databendDSN": "http://databend:databend@localhost:8000",
+  "databendTable": "default.test_table",
+  "batchSize": 2,
+  "batchMaxInterval": 30,
+  "userStage": "~",
+  "deleteAfterSync": false,
+  "maxThread": 5
+}
+
+
