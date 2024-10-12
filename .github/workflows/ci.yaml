@@ -27,6 +27,19 @@ jobs:
         ports:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=10
+      oracle:
+        image: wnameless/oracle-xe-11g-r2
+        environment:
+          - ORACLE_PASSWORD=123
+          - ORACLE_SID=XE
+        ports:
+          - 49161:1521
+        volumes:
+          - oracle-volume:/u01/app/oracle/oradata
+        options: --health-cmd="nc -z localhost 1521" --health-interval=10s --health-timeout=5s --health-retries=10
+    volumes:
+      oracle-volume:
+
 
     steps:
       - name: Checkout
@@ -37,8 +50,34 @@ jobs:
           sleep 60
           curl -v http://localhost:8000/v1/health
 
+      - name: Create Oracle User
+        run: |
+          sleep 60
+          sqlplus system/123@localhost:49161/XE << EOF
+          CREATE USER a IDENTIFIED BY 123;
+          GRANT DBA TO a;
+          EXIT
+          EOF
+
+      - name: Cache Instant Client
+        id: cache-instant-client
+        uses: actions/cache@v3
+        with:
+          path: /opt/oracle/instantclient_23_4
+          key: oracle-instant-client-23.4.0.24.05-basic-linux-x64
+
+      - name: Install Oracle Instant Client
+        run: |
+          mkdir -p /opt/oracle
+          cd /opt/oracle
+          wget https://download.oracle.com/otn_software/linux/instantclient/2340000/instantclient-basic-linux.x64-23.4.0.24.05.zip -O instantclient.zip
+          unzip instantclient.zip
+          rm instantclient.zip
+
       - name: Test
         env:
           TEST_DATABEND_DSN: "http://databend:databend@localhost:8000"
+          ORACLE_HOME: /opt/oracle/instantclient_23_4
+          LD_LIBRARY_PATH: ${{ env.ORACLE_HOME }}:$LD_LIBRARY_PATH
         run: |
           go test -v -p 1 -cover ./...
