@@ -52,17 +52,18 @@ func NewOracleSource(cfg *config.Config) (*OracleSource, error) {
 	if cfg.SSLMode == "" {
 		cfg.SSLMode = "disable"
 	}
-	db, err := sql.Open("godror", fmt.Sprintf("oracle://%s:%s@%s:%d/XE?service_name=%s?sslmode=%s",
+	db, err := sql.Open("godror", fmt.Sprintf("oracle://%s:%s@%s:%d/%s?service_name=%s&sslmode=%s",
 		cfg.SourceUser,
 		cfg.SourcePass,
 		cfg.SourceHost,
 		cfg.SourcePort,
+		cfg.OracleSID,
+		cfg.SourceDB,
 		cfg.SSLMode))
 	if err != nil {
 		logrus.Errorf("failed to open oracle db: %v", err)
 		return nil, err
 	}
-	// 测试连接
 	err = db.Ping()
 	if err != nil {
 		log.Fatal(err)
@@ -82,12 +83,12 @@ func (p *OracleSource) SwitchDatabase() error {
 	}
 
 	// Open a new connection to the new database
-	// oracle://a:123@0.0.0.0:49161/XE
-	db, err := sql.Open("godror", fmt.Sprintf("oracle://%s:%s@%s:%d/XE?service_name=%s?sslmode=%s",
+	db, err := sql.Open("godror", fmt.Sprintf("oracle://%s:%s@%s:%d/%s?service_name=%s&sslmode=%s",
 		p.cfg.SourceUser,
 		p.cfg.SourcePass,
 		p.cfg.SourceHost,
 		p.cfg.SourcePort,
+		p.cfg.OracleSID,
 		p.cfg.SourceDB,
 		p.cfg.SSLMode))
 	if err != nil {

@@ -23,6 +23,7 @@ import (
 
 func TestMultipleDbTablesWorkflow(t *testing.T) {
 	{
+		fmt.Println("=== TEST MYSQL SOURCE ===")
 		prepareMySQLDbxTablex()
 		prepareDatabend("test_table2", "http://databend:databend@localhost:8000")
 
@@ -55,6 +56,7 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 	}
 
 	{
+		fmt.Println("=== TEST ORACLE SOURCE ===")
 		prepareOracleDbxTablex()
 		truncateDatabend("test_table2", "http://databend:databend@localhost:8000")
 		prepareDatabend("test_table2", "http://databend:databend@localhost:8000")
@@ -90,6 +92,7 @@ func TestMultipleDbTablesWorkflow(t *testing.T) {
 
 func TestWorkFlow(t *testing.T) {
 	{
+		fmt.Println("=== TEST MYSQL SOURCE ===")
 		prepareMysql()
 		prepareDatabend("test_table", "http://databend:databend@localhost:8000")
 		testConfig := prepareTestConfig()
@@ -136,6 +139,7 @@ func TestWorkFlow(t *testing.T) {
 	}
 
 	{
+		fmt.Println("=== TEST ORACLE SOURCE ===")
 		prepareOracle()
 		truncateDatabend("test_table", "http://databend:databend@localhost:8000")
 		prepareDatabend("test_table", "http://databend:databend@localhost:8000")
@@ -178,7 +182,8 @@ func TestWorkFlow(t *testing.T) {
 		fmt.Println(endTime)
 		fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
 
-		err = checkTargetTable("test_table", 10)
+		// mydb1 10 rows , mydb2 5 rows, mydb 10 rows
+		err = checkTargetTable("test_table", 25)
 		assert.NoError(t, err)
 	}
 }
@@ -242,7 +247,7 @@ CREATE TABLE db2.test_table2 (
 }
 
 func prepareOracleDbxTablex() {
-	db, err := sql.Open("godror", "oracle://a:123@0.0.0.0:49161/XE")
+	db, err := sql.Open("godror", "oracle://a:123@localhost:49161/XE")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -325,7 +330,7 @@ CREATE TABLE mydb2.test_table2 (
 }
 
 func prepareMysql() {
-	db, err := sql.Open("mysql", "a:123@tcp(127.0.0.1:3306)/mysql")
+	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/mysql")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -389,7 +394,7 @@ func prepareMysql() {
 }
 
 func prepareOracle() {
-	db, err := sql.Open("godror", "oracle://a:123@0.0.0.0:49161/XE")
+	db, err := sql.Open("godror", "oracle://a:123@localhost:49161/XE")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -422,7 +427,7 @@ func prepareOracle() {
 			timestamp_col TIMESTAMP
 		)
 	`)
-	// need to test the TIME type in mysql
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -473,9 +478,10 @@ func truncateDatabend(tableName string, dsn string) {
 	}
 	defer db.Close()
 
-	// Create table
+	// TRUNCATE TABLE
 	_, err = db.Exec(fmt.Sprintf(
-		`TRUNCATE TABLE default.%s`, tableName))
+		`TRUNCATE TABLE default.%s
+	`, tableName))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -486,14 +492,14 @@ func prepareTestConfig() *cfg.Config {
 		SourceDB:             "mydb",
 		SourceHost:           "127.0.0.1",
 		SourcePort:           3306,
-		SourceUser:           "a",
-		SourcePass:           "123",
+		SourceUser:           "root",
+		SourcePass:           "123456",
 		SourceTable:          "test_table",
 		SourceWhereCondition: "id > 0",
 		SourceQuery:          "select * from mydb.test_table",
 		SourceSplitKey:       "id",
 		SourceSplitTimeKey:   "",
-		DatabendDSN:          "https://dbarchiver:abc123@tn3ftqihs--medium-p8at.gw.aws-us-east-2.default.databend.com:443",
+		DatabendDSN:          "http://databend:databend@localhost:8000",
 		DatabendTable:        "default.test_table",
 		BatchSize:            5,
 		BatchMaxInterval:     3,
@@ -530,6 +536,7 @@ func prepareOracleTestConfig() *cfg.Config {
 		DeleteAfterSync:      false,
 		DisableVariantCheck:  false,
 		UserStage:            "~",
+		OracleSID:            "XE",
 	}
 
 	return &config
@@ -565,14 +572,12 @@ func prepareMySQLMultipleConfig() *cfg.Config {
 
 func prepareOracleMultipleConfig() *cfg.Config {
 	config := cfg.Config{
-		DatabaseType: "oracle",
-		//SourceDB:             "MYDB",
-		SourceHost:     "127.0.0.1",
-		SourcePort:     49161,
-		SourceUser:     "a",
-		SourcePass:     "123",
-		SourceDbTables: []string{"MYDB.*@TEST_TABLE.*"},
-		//SourceTable:          "TEST_TABLE",
+		DatabaseType:         "oracle",
+		SourceHost:           "127.0.0.1",
+		SourcePort:           49161,
+		SourceUser:           "a",
+		SourcePass:           "123",
+		SourceDbTables:       []string{"MYDB.*@TEST_TABLE.*"},
 		SourceWhereCondition: "id > 0",
 		SourceQuery:          "select * from mydb2.test_table",
 		SourceSplitKey:       "id",
@@ -587,6 +592,7 @@ func prepareOracleMultipleConfig() *cfg.Config {
 		DeleteAfterSync:      false,
 		DisableVariantCheck:  false,
 		UserStage:            "~",
+		OracleSID:            "XE",
 	}
 
 	return &config

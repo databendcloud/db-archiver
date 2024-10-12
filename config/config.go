@@ -64,6 +64,8 @@ type Config struct {
 	UserStage           string `json:"userStage" default:"~"`
 	DeleteAfterSync     bool   `json:"deleteAfterSync" default:"false"`
 	MaxThread           int    `json:"maxThread" default:"2"`
+	// Oracle
+	OracleSID string `json:"oracleSID"`
 }
 
 func LoadConfig(configFile string) (*Config, error) {

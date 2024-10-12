@@ -15,7 +15,8 @@
   "batchMaxInterval": 30,
   "userStage": "~",
   "deleteAfterSync": false,
-  "maxThread": 5
+  "maxThread": 5,
+  "oracleSID": "XE"
 }
 
 
