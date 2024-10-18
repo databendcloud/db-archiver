@@ -44,9 +44,9 @@ jobs:
           cd cmd/_bin/db-archiver && \
           ${{ env.DIST_DIRS }} cp ../../LICENSE {} \; && \
           ${{ env.DIST_DIRS }} cp ../../README.md {} \; && \
-          ${{ env.DIST_DIRS }} tar -zcf db-archiver-{}.tar.gz {} \; && \
+          ${{ env.DIST_DIRS }} tar -zcf db-archiver-{}-${{ github.ref_name }}.tar.gz {} \; && \
           cd .. && \
-          sha256sum db-archiver/db-archiver-* >> sha256-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.txt
+          sha256sum db-archiver/db-archiver-*-${{ github.ref_name }}.tar.gz >> sha256-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.txt
       - name: Delete existing asset
         uses: actions/github-script@v6
         with:
@@ -58,7 +58,7 @@ jobs:
               repo: context.repo.repo,
               tag: '${{ github.ref_name }}'
             });
-            const asset_name = 'db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz';
+            const asset_name = 'db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}-${{ github.ref_name }}.tar.gz';
             for (const asset of release.data.assets) {
               if (asset.name === asset_name) {
                 await github.rest.repos.deleteReleaseAsset({
@@ -74,8 +74,8 @@ jobs:
         uses: actions/upload-release-asset@v1.0.2
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: cmd/_bin/db-archiver/db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz
-          asset_name: db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz
+          asset_path: cmd/_bin/db-archiver/db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}-${{ github.ref_name }}.tar.gz
+          asset_name: db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}-${{ github.ref_name }}.tar.gz
           asset_content_type: application/gzip
       - name: Post sha256
         uses: actions/upload-artifact@v4
