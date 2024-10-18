@@ -257,6 +257,8 @@ func (s *MysqlSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern
 		if match {
 			fmt.Println("match db: ", database)
 			databases = append(databases, database)
+		} else {
+			fmt.Println("not match db: ", database)
 		}
 	}
 	return databases, nil
