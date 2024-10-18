@@ -27,12 +27,6 @@ jobs:
         ports:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=10
-      oracle:
-        image: wnameless/oracle-xe-11g-r2
-        env:
-          ORACLE_SID: XE
-        ports:
-          - 49161:1521
 
     steps:
       - name: Checkout
@@ -43,40 +37,8 @@ jobs:
           sleep 60
           curl -v http://localhost:8000/v1/health
 
-      - name: Cache Instant Client
-        id: cache-instant-client
-        uses: actions/cache@v3
-        with:
-          path: /opt/oracle/instantclient_23_4
-          key: oracle-instant-client-23.4.0.24.05-basic-linux-x64
-
-      - name: Install Oracle Instant Client
-        run: |
-          wget https://download.oracle.com/otn_software/linux/instantclient/214000/instantclient-basic-linux.x64-21.4.0.0.0dbru.zip
-          wget https://download.oracle.com/otn_software/linux/instantclient/214000/instantclient-sqlplus-linux.x64-21.4.0.0.0dbru.zip
-          mkdir -p /opt/oracle
-          unzip -d /opt/oracle instantclient-basic-linux.x64-21.4.0.0.0dbru.zip
-          unzip -d /opt/oracle instantclient-sqlplus-linux.x64-21.4.0.0.0dbru.zip
-          export LD_LIBRARY_PATH=/opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH
-          export PATH=$LD_LIBRARY_PATH:$PATH
-          rm instantclient-basic-linux.x64-21.4.0.0.0dbru.zip
-          rm instantclient-sqlplus-linux.x64-21.4.0.0.0dbru.zip
-
-      - name: Create Oracle User
-        env:
-          TEST_DATABEND_DSN: "http://databend:databend@localhost:8000"
-          LD_LIBRARY_PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH
-          PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH:$PATH
-        run: |
-          sqlplus system/oracle@localhost:49161/XE << EOF
-          CREATE USER a IDENTIFIED BY 123 DEFAULT TABLESPACE USERS;
-          GRANT DBA TO a;
-          EXIT
-          EOF
-
       - name: Test
         env:
           TEST_DATABEND_DSN: "http://databend:databend@localhost:8000"
-          LD_LIBRARY_PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH
         run: |
           go test -v -p 1 -cover ./...
