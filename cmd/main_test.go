@@ -157,7 +157,7 @@ CREATE TABLE db2.test_table2 (
 }
 
 func prepareMysql() {
-	db, err := sql.Open("mysql", "a:123@tcp(127.0.0.1:3306)/mysql")
+	db, err := sql.Open("mysql", "root:123456@tcp(127.0.0.1:3306)/mysql")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -251,14 +251,14 @@ func prepareTestConfig() *cfg.Config {
 		SourceDB:             "mydb",
 		SourceHost:           "127.0.0.1",
 		SourcePort:           3306,
-		SourceUser:           "a",
-		SourcePass:           "123",
+		SourceUser:           "root",
+		SourcePass:           "123456",
 		SourceTable:          "test_table",
 		SourceWhereCondition: "id > 0",
 		SourceQuery:          "select * from mydb.test_table",
 		SourceSplitKey:       "id",
 		SourceSplitTimeKey:   "",
-		DatabendDSN:          "https://dbarchiver:abc123@tn3ftqihs--medium-p8at.gw.aws-us-east-2.default.databend.com:443",
+		DatabendDSN:          "http://databend:databend@localhost:8000",
 		DatabendTable:        "default.test_table",
 		BatchSize:            5,
 		BatchMaxInterval:     3,
