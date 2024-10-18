@@ -20,7 +20,7 @@ type PostgresSource struct {
 	statsRecorder *DatabendSourceStatsRecorder
 }
 
-func (p *PostgresSource) AdjustBatchSizeAccordingToSourceDbTable() int64 {
+func (p PostgresSource) AdjustBatchSizeAccordingToSourceDbTable() int64 {
 	minSplitKey, maxSplitKey, err := p.GetMinMaxSplitKey()
 	if err != nil {
 		return p.cfg.BatchSize
@@ -91,7 +91,7 @@ func (p *PostgresSource) SwitchDatabase() error {
 	p.db = db
 	return nil
 }
-func (p *PostgresSource) GetSourceReadRowsCount() (int, error) {
+func (p PostgresSource) GetSourceReadRowsCount() (int, error) {
 	err := p.SwitchDatabase()
 	if err != nil {
 		return 0, err
@@ -107,7 +107,7 @@ func (p *PostgresSource) GetSourceReadRowsCount() (int, error) {
 	return rowCount, nil
 }
 
-func (p *PostgresSource) GetMinMaxSplitKey() (int64, int64, error) {
+func (p PostgresSource) GetMinMaxSplitKey() (int64, int64, error) {
 	err := p.SwitchDatabase()
 	if err != nil {
 		return 0, 0, err
@@ -135,7 +135,7 @@ func (p *PostgresSource) GetMinMaxSplitKey() (int64, int64, error) {
 	return minSplitKey.Int64, maxSplitKey.Int64, nil
 }
 
-func (p *PostgresSource) GetMinMaxTimeSplitKey() (string, string, error) {
+func (p PostgresSource) GetMinMaxTimeSplitKey() (string, string, error) {
 	err := p.SwitchDatabase()
 	if err != nil {
 		return "", "", err
@@ -157,7 +157,7 @@ func (p *PostgresSource) GetMinMaxTimeSplitKey() (string, string, error) {
 	return minSplitKey, maxSplitKey, nil
 }
 
-func (p *PostgresSource) DeleteAfterSync() error {
+func (p PostgresSource) DeleteAfterSync() error {
 	err := p.SwitchDatabase()
 	if err != nil {
 		return err
@@ -172,7 +172,7 @@ func (p *PostgresSource) DeleteAfterSync() error {
 	return nil
 }
 
-func (p *PostgresSource) QueryTableData(threadNum int, conditionSql string) ([][]interface{}, []string, error) {
+func (p PostgresSource) QueryTableData(threadNum int, conditionSql string) ([][]interface{}, []string, error) {
 	startTime := time.Now()
 	err := p.SwitchDatabase()
 	if err != nil {
@@ -290,7 +290,7 @@ func (p *PostgresSource) QueryTableData(threadNum int, conditionSql string) ([][
 	return result, columns, nil
 }
 
-func (p *PostgresSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern string) ([]string, error) {
+func (p PostgresSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern string) ([]string, error) {
 	rows, err := p.db.Query("SELECT datname FROM pg_database")
 	if err != nil {
 		return nil, err
@@ -315,7 +315,7 @@ func (p *PostgresSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePatt
 	return databases, nil
 }
 
-func (p *PostgresSource) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
+func (p PostgresSource) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
 	dbTables := make(map[string][]string)
 	for _, database := range databases {
 		p.cfg.SourceDB = database
@@ -349,7 +349,7 @@ func (p *PostgresSource) GetTablesAccordingToSourceTableRegex(sourceTablePattern
 	return dbTables, nil
 }
 
-func (p *PostgresSource) GetAllSourceReadRowsCount() (int, error) {
+func (p PostgresSource) GetAllSourceReadRowsCount() (int, error) {
 	allCount := 0
 
 	dbTables, err := p.GetDbTablesAccordingToSourceDbTables()
@@ -371,7 +371,7 @@ func (p *PostgresSource) GetAllSourceReadRowsCount() (int, error) {
 	return allCount, nil
 }
 
-func (p *PostgresSource) GetDbTablesAccordingToSourceDbTables() (map[string][]string, error) {
+func (p PostgresSource) GetDbTablesAccordingToSourceDbTables() (map[string][]string, error) {
 	allDbTables := make(map[string][]string)
 	for _, sourceDbTable := range p.cfg.SourceDbTables {
 		dbTable := strings.Split(sourceDbTable, "@") // because `.` in regex is a special character, so use `@` to split

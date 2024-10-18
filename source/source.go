@@ -34,8 +34,6 @@ func NewSource(cfg *config.Config) (Sourcer, error) {
 		return NewMysqlSource(cfg)
 	case "pg":
 		return NewPostgresSource(cfg)
-	case "oracle":
-		return NewOracleSource(cfg)
 	default:
 		return NewMysqlSource(cfg)
 	}
@@ -185,8 +183,8 @@ func GenerateJSONFile(columns []string, data [][]interface{}) (string, int, erro
 }
 
 func generateNDJsonFile(batchJsonData []string) (string, int, error) {
-	fileName := fmt.Sprintf("databend-ingest-%d-", time.Now().UnixNano())
-	outputFile, err := os.CreateTemp("/tmp", fileName+"*.ndjson")
+	fileName := fmt.Sprintf("databend-ingest-%d.ndjson", time.Now().UnixNano())
+	outputFile, err := os.CreateTemp("/tmp", fileName)
 	if err != nil {
 		return "", 0, err
 	}
