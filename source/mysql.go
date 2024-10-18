@@ -249,16 +249,12 @@ func (s *MysqlSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("sourcedatabase pattern", sourceDatabasePattern)
 		match, err := regexp.MatchString(sourceDatabasePattern, database)
 		if err != nil {
 			return nil, err
 		}
 		if match {
-			fmt.Println("match db: ", database)
 			databases = append(databases, database)
-		} else {
-			fmt.Println("not match db: ", database)
 		}
 	}
 	return databases, nil
