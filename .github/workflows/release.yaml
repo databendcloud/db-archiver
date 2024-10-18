@@ -6,7 +6,6 @@ on:
       - created
 
 env:
-  # Common versions
   GO_VERSION: '1.21'
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -32,8 +31,8 @@ jobs:
         id: get_matrix
         run: |
           TARGETS=${{matrix.TARGETS}}
-          echo ::set-output name=OS::${TARGETS%/*}
-          echo ::set-output name=ARCH::${TARGETS#*/}
+          echo "OS=${TARGETS%/*}" >> $GITHUB_OUTPUT
+          echo "ARCH=${TARGETS#*/}" >> $GITHUB_OUTPUT
       - name: Build
         run: |
           cd cmd && \
@@ -47,40 +46,79 @@ jobs:
           ${{ env.DIST_DIRS }} cp ../../README.md {} \; && \
           ${{ env.DIST_DIRS }} tar -zcf db-archiver-{}.tar.gz {} \; && \
           cd .. && \
-          sha256sum db-archiver/db-archiver-* >> sha256-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.txt \
+          sha256sum db-archiver/db-archiver-* >> sha256-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.txt
+      - name: Delete existing asset
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const fs = require('fs');
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: '${{ github.ref_name }}'
+            });
+            const asset_name = 'db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz';
+            for (const asset of release.data.assets) {
+              if (asset.name === asset_name) {
+                await github.rest.repos.deleteReleaseAsset({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  asset_id: asset.id
+                });
+                console.log(`Deleted existing asset: ${asset_name}`);
+                break;
+              }
+            }
       - name: Upload db-archiver tar.gz
         uses: actions/upload-release-asset@v1.0.2
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
           asset_path: cmd/_bin/db-archiver/db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz
           asset_name: db-archiver-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.tar.gz
-          asset_content_type: binary/octet-stream
+          asset_content_type: application/gzip
       - name: Post sha256
         uses: actions/upload-artifact@v4
         with:
           name: sha256sums
           path: cmd/_bin/sha256-${{ steps.get_matrix.outputs.OS }}-${{ steps.get_matrix.outputs.ARCH }}.txt
           retention-days: 1
-  upload-sha256sums-plugin:
+
+  upload-sha256sums:
     needs: build_and_upload
     runs-on: ubuntu-latest
-    name: upload-sha256sums
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
       - name: Get release
         id: get_release
         uses: bruceadams/get-release@v1.2.2
       - name: Download sha256sums
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: sha256sums
-      - shell: bash
+      - name: Combine sha256sums
         run: |
-          for file in *.txt
-          do
-            cat ${file} >> sha256sums.txt
-          done
+          cat *.txt > sha256sums.txt
+      - name: Delete existing sha256sums
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: '${{ github.ref_name }}'
+            });
+            for (const asset of release.data.assets) {
+              if (asset.name === 'sha256sums.txt') {
+                await github.rest.repos.deleteReleaseAsset({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  asset_id: asset.id
+                });
+                console.log('Deleted existing sha256sums.txt');
+                break;
+              }
+            }
       - name: Upload Checksums
         uses: actions/upload-release-asset@v1.0.2
         with:
