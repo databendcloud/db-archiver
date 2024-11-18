@@ -16,7 +16,7 @@ jobs:
       matrix:
         TARGETS: [ linux/amd64, darwin/amd64, linux/arm64 ]
     env:
-      GO_BUILD_ENV: GO111MODULE=on CGO_ENABLED=0
+      GO_BUILD_ENV: GO111MODULE=on CGO_ENABLED=1
       DIST_DIRS: find * -type d -exec
     steps:
       - uses: actions/checkout@v4
