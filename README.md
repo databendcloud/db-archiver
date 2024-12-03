@@ -117,8 +117,8 @@ Th example of the `conf.json`:
   "copyForce": false,
   "disableVariantCheck": false,
   "userStage": "~",
-  "deleteAfterSync": false
-  "maxThreads": 10
+  "deleteAfterSync": false,
+  "maxThread": 10
 }
 ```
 
