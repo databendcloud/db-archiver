@@ -311,6 +311,16 @@ func (s *MysqlSource) GetAllSourceReadRowsCount() (int, error) {
 			allCount += count
 		}
 	}
+	if allCount != 0 {
+		return allCount, nil
+	}
+	if len(dbTables) == 0 && s.cfg.SourceTable != "" {
+		count, err := s.GetSourceReadRowsCount()
+		if err != nil {
+			return 0, err
+		}
+		allCount += count
+	}
 
 	return allCount, nil
 }
