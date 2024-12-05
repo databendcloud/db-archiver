@@ -25,6 +25,7 @@ import (
 var (
 	ErrUploadStageFailed = errors.New("upload stage failed")
 	ErrCopyIntoFailed    = errors.New("copy into failed")
+	ErrGetPresignUrl     = errors.New("failed to get presigned url")
 )
 
 type databendIngester struct {
@@ -86,14 +87,12 @@ func (ig *databendIngester) IngestData(threadNum int, columns []string, batchDat
 
 	stage, err := ig.uploadToStage(fileName)
 	if err != nil {
-		l.Errorf("upload to stage failed: %v\n", err)
 		return err
 	}
 
 	copyIntoStartTime := time.Now()
 	err = ig.copyInto(stage)
 	if err != nil {
-		l.Errorf("copy into failed: %v\n", err)
 		return err
 	}
 	l.Infof("thread-%d: copy into cost: %v ms", threadNum, time.Since(copyIntoStartTime).Milliseconds())
@@ -137,7 +136,7 @@ func (ig *databendIngester) uploadToStage(fileName string) (*godatabend.StageLoc
 	presignedStartTime := time.Now()
 	presigned, err := apiClient.GetPresignedURL(context.Background(), stage)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get presigned url")
+		return nil, errors.Wrap(ErrGetPresignUrl, err.Error())
 	}
 	logrus.Infof("get presigned url cost: %v ms", time.Since(presignedStartTime).Milliseconds())
 
@@ -206,16 +205,30 @@ func execute(db *sql.DB, sql string) error {
 
 func (ig *databendIngester) DoRetry(f retry.RetryableFunc) error {
 	delay := time.Second
-	maxDelay := 30 * time.Minute
+	maxDelay := 60 * time.Minute
+	maxAttempts := 500
+	attempt := 0
+
 	return retry.Do(
 		func() error {
-			return f()
+			err := f()
+			if err != nil {
+				logrus.Infof("Attempt %d failed: %v", attempt, err)
+			}
+			attempt++
+			return err
 		},
 		retry.RetryIf(func(err error) bool {
 			if err == nil {
 				return false
 			}
-			if errors.Is(err, ErrUploadStageFailed) || errors.Is(err, ErrCopyIntoFailed) {
+			if attempt >= maxAttempts {
+				logrus.Warnf("Reached maximum retry attempts (%d)", maxAttempts)
+				return false
+			}
+			if errors.Is(err, ErrUploadStageFailed) ||
+				errors.Is(err, ErrCopyIntoFailed) ||
+				errors.Is(err, ErrGetPresignUrl) {
 				return true
 			}
 			return false
@@ -223,5 +236,6 @@ func (ig *databendIngester) DoRetry(f retry.RetryableFunc) error {
 		retry.Delay(delay),
 		retry.MaxDelay(maxDelay),
 		retry.DelayType(retry.BackOffDelay),
+		retry.Attempts(uint(maxAttempts)),
 	)
 }
