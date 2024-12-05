@@ -111,7 +111,7 @@ func (w *Worker) stepBatch() error {
 					logrus.Infof("condition: %s", condition)
 					err := w.stepBatchWithCondition(idx, condition)
 					if err != nil {
-						logrus.Errorf("stepBatchWithCondition failed: %v", err)
+						logrus.Errorf("Thread %d, stepBatchWithCondition failed: %v", idx, err)
 					}
 				}
 			}(i)
