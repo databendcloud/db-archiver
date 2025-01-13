@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -22,9 +23,10 @@ type SQLServerSource struct {
 
 func NewSqlServerSource(cfg *config.Config) (*SQLServerSource, error) {
 	stats := NewDatabendIntesterStatsRecorder()
-	db, err := sql.Open("mssql", fmt.Sprintf("sqlserver://%s:%s@%s:%d/%s?encrypt=disable",
+	encodedPassword := url.QueryEscape(cfg.SourcePass)
+	db, err := sql.Open("mssql", fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s&encrypt=disable",
 		cfg.SourceUser,
-		cfg.SourcePass,
+		encodedPassword,
 		cfg.SourceHost,
 		cfg.SourcePort, cfg.SourceDB))
 	if err != nil {
