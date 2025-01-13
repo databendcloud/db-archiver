@@ -75,7 +75,8 @@ jobs:
           LD_LIBRARY_PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH
           PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH:$PATH
         run: |
-          apt-get install libaio1
+          echo $PATH
+          apt install libaio1
           sqlplus system/oracle@localhost:49161/XE << EOF
           CREATE USER a IDENTIFIED BY 123 DEFAULT TABLESPACE USERS;
           GRANT DBA TO a;
