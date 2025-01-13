@@ -39,7 +39,7 @@ jobs:
           ACCEPT_EULA: Y
           MSSQL_SA_PASSWORD: "Password1234!"
         ports:
-          - 49161:1433
+          - 1433:1433
 
     steps:
       - name: Checkout
