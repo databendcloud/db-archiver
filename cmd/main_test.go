@@ -186,6 +186,54 @@ func TestWorkFlow(t *testing.T) {
 		err = checkTargetTable("test_table", 25)
 		assert.NoError(t, err)
 	}
+
+	{
+		fmt.Println("=== TEST MSSQL SOURCE ===")
+		prepareSQLServer()
+		truncateDatabend("test_table", "http://databend:databend@localhost:8000")
+		prepareDatabend("test_table", "http://databend:databend@localhost:8000")
+		testConfig := prepareSqlServerTestConfig()
+		startTime := time.Now()
+
+		src, err := source.NewSource(testConfig)
+		if err != nil {
+			panic(err)
+		}
+		wg := sync.WaitGroup{}
+		dbs, err := src.GetDatabasesAccordingToSourceDbRegex(testConfig.SourceDB)
+		if err != nil {
+			panic(err)
+		}
+		dbTables, err := src.GetTablesAccordingToSourceTableRegex(testConfig.SourceTable, dbs)
+		if err != nil {
+			panic(err)
+		}
+		for db, tables := range dbTables {
+			for _, table := range tables {
+				wg.Add(1)
+				db := db
+				table := table
+				go func(cfg *cfg.Config, db, table string) {
+					cfgCopy := *testConfig
+					cfgCopy.SourceTable = table
+					cfgCopy.SourceDB = db
+					ig := ingester.NewDatabendIngester(&cfgCopy)
+					src, err := source.NewSource(&cfgCopy)
+					assert.NoError(t, err)
+					w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
+					w.Run(context.Background())
+					wg.Done()
+				}(testConfig, db, table)
+			}
+		}
+		wg.Wait()
+		endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
+		fmt.Println(endTime)
+		fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
+
+		err = checkTargetTable("test_table", 25)
+		assert.NoError(t, err)
+	}
 }
 
 func prepareMySQLDbxTablex() {
@@ -514,6 +562,75 @@ func prepareTestConfig() *cfg.Config {
 	return &config
 }
 
+func prepareSQLServer() {
+	// 连接字符串格式：sqlserver://username:password@host:port?database=dbname
+	db, err := sql.Open("mssql", "sqlserver://sa:Password1234!@localhost:1433?encrypt=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// 删除已存在的数据库
+	_, err = db.Exec(`
+        IF EXISTS (SELECT * FROM sys.databases WHERE name = 'mydb')
+        BEGIN
+            ALTER DATABASE mydb SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+            DROP DATABASE mydb;
+        END
+    `)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 创建新数据库
+	_, err = db.Exec("CREATE DATABASE mydb")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 切换到新创建的数据库
+	_, err = db.Exec("USE mydb")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 创建表
+	_, err = db.Exec(`
+        CREATE TABLE test_table (
+            id INT PRIMARY KEY,
+            int_col INT,
+            varchar_col VARCHAR(255),
+            float_col FLOAT,
+            bool_col BIT,
+            de DECIMAL(18,6),
+            date_col DATE,
+            datetime_col DATETIME2,
+            timestamp_col DATETIME2
+        )
+    `)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 插入数据
+	for i := 1; i <= 10; i++ {
+		insert := fmt.Sprintf(`
+            INSERT INTO test_table 
+            (id, int_col, varchar_col, float_col, de, bool_col, date_col, datetime_col, timestamp_col)
+            VALUES 
+            (%d, %d, '%s', %f, %d, %d, '%s', '%s', '%s')`,
+			i, i, fmt.Sprintf("varchar %d", i), float64(i), i%2, 1,
+			"2022-01-01",
+			"2022-01-01 00:00:00",
+			"2024-06-30 20:00:00")
+
+		_, err = db.Exec(insert)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
 func prepareOracleTestConfig() *cfg.Config {
 	config := cfg.Config{
 		DatabaseType:         "oracle",
@@ -537,6 +654,33 @@ func prepareOracleTestConfig() *cfg.Config {
 		DisableVariantCheck:  false,
 		UserStage:            "~",
 		OracleSID:            "XE",
+	}
+
+	return &config
+}
+
+func prepareSqlServerTestConfig() *cfg.Config {
+	config := cfg.Config{
+		DatabaseType:         "mssql",
+		SourceDB:             "mydb",
+		SourceHost:           "127.0.0.1",
+		SourcePort:           1433,
+		SourceUser:           "sa",
+		SourcePass:           "Password1234!",
+		SourceTable:          "test_table",
+		SourceWhereCondition: "id > 0",
+		SourceSplitKey:       "id",
+		SourceSplitTimeKey:   "",
+		DatabendDSN:          "http://databend:databend@localhost:8000",
+		DatabendTable:        "default.test_table",
+		BatchSize:            5,
+		BatchMaxInterval:     3,
+		MaxThread:            2,
+		CopyForce:            false,
+		CopyPurge:            false,
+		DeleteAfterSync:      false,
+		DisableVariantCheck:  false,
+		UserStage:            "~",
 	}
 
 	return &config

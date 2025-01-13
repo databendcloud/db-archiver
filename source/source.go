@@ -36,6 +36,8 @@ func NewSource(cfg *config.Config) (Sourcer, error) {
 		return NewPostgresSource(cfg)
 	case "oracle":
 		return NewOracleSource(cfg)
+	case "mssql":
+		return NewSqlServerSource(cfg)
 	default:
 		return NewMysqlSource(cfg)
 	}
