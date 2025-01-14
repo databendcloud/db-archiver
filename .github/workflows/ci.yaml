@@ -69,20 +69,17 @@ jobs:
           rm instantclient-basic-linux.x64-21.4.0.0.0dbru.zip
           rm instantclient-sqlplus-linux.x64-21.4.0.0.0dbru.zip
 
-      - name: Create Oracle User
-        env:
-          TEST_DATABEND_DSN: "http://databend:databend@localhost:8000"
-          LD_LIBRARY_PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH
-          PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH:$PATH
-        run: |
-          cat /etc/os-release
-          echo $PATH
-          apt install libaio1
-          sqlplus system/oracle@localhost:49161/XE << EOF
-          CREATE USER a IDENTIFIED BY 123 DEFAULT TABLESPACE USERS;
-          GRANT DBA TO a;
-          EXIT
-          EOF
+#      - name: Create Oracle User
+#        env:
+#          TEST_DATABEND_DSN: "http://databend:databend@localhost:8000"
+#          LD_LIBRARY_PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH
+#          PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH:$PATH
+#        run: |
+#          sqlplus system/oracle@localhost:49161/XE << EOF
+#          CREATE USER a IDENTIFIED BY 123 DEFAULT TABLESPACE USERS;
+#          GRANT DBA TO a;
+#          EXIT
+#          EOF
 
       - name: Test
         env:
