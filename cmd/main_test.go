@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	go_ora "github.com/sijms/go-ora/v2"
 	"github.com/test-go/testify/assert"
 
 	cfg "github.com/databendcloud/db-archiver/config"
@@ -18,7 +19,6 @@ import (
 	"github.com/databendcloud/db-archiver/worker"
 
 	_ "github.com/datafuselabs/databend-go"
-	_ "github.com/godror/godror"
 )
 
 func TestMultipleDbTablesWorkflow(t *testing.T) {
@@ -295,9 +295,19 @@ CREATE TABLE db2.test_table2 (
 }
 
 func prepareOracleDbxTablex() {
-	db, err := sql.Open("godror", "oracle://a:123@localhost:49161/XE")
+	server := "localhost"
+	port := 49161
+	serviceName := "XE"
+	username := "a"
+	password := "123"
+
+	// 使用 go-ora 构建连接字符串
+	connStr := go_ora.BuildUrl(server, port, serviceName, username, password, nil)
+
+	// 打开数据库连接
+	db, err := sql.Open("oracle", connStr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to open connection: %v", err)
 	}
 	defer db.Close()
 
@@ -442,9 +452,17 @@ func prepareMysql() {
 }
 
 func prepareOracle() {
-	db, err := sql.Open("godror", "oracle://a:123@localhost:49161/XE")
+	server := "localhost"
+	port := 49161
+	serviceName := "XE"
+	username := "a"
+	password := "123"
+
+	connStr := go_ora.BuildUrl(server, port, serviceName, username, password, nil)
+
+	db, err := sql.Open("oracle", connStr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to open connection: %v", err)
 	}
 	defer db.Close()
 	_, err = db.Exec("BEGIN EXECUTE IMMEDIATE 'DROP USER mydb CASCADE'; EXCEPTION WHEN OTHERS THEN IF SQLCODE = -1918 THEN NULL; ELSE RAISE; END IF; END;")
