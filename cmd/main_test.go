@@ -588,7 +588,7 @@ func prepareTestConfig() *cfg.Config {
 
 func prepareSQLServer() {
 	log.Println("===prepareSQLServer===")
-	encodedPassword := url.QueryEscape("Passw@rd")
+	encodedPassword := url.QueryEscape("Password1234!")
 	// sqlserver://username:password@host:port?database=dbname
 	db, err := sql.Open("mssql", fmt.Sprintf("sqlserver://sa:%s@localhost:1433?encrypt=disable", encodedPassword))
 	if err != nil {
@@ -693,7 +693,7 @@ func prepareSqlServerTestConfig() *cfg.Config {
 		SourceHost:           "127.0.0.1",
 		SourcePort:           1433,
 		SourceUser:           "sa",
-		SourcePass:           "Passw@rd",
+		SourcePass:           "Password1234!",
 		SourceTable:          "test_table",
 		SourceWhereCondition: "id > 0",
 		SourceSplitKey:       "id",
