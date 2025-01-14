@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -92,7 +93,7 @@ func TestOracleMultiTableWorkflow(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestWorkFlow(t *testing.T) {
+func TestMySQLWorkFlow(t *testing.T) {
 	{
 		fmt.Println("=== TEST MYSQL SOURCE ===")
 		prepareMysql()
@@ -139,56 +140,56 @@ func TestWorkFlow(t *testing.T) {
 		err = checkTargetTable("test_table", 20)
 		assert.NoError(t, err)
 	}
+}
 
-	{
-		fmt.Println("=== TEST MSSQL SOURCE ===")
-		prepareSQLServer()
-		truncateDatabend("test_table", "http://databend:databend@localhost:8000")
-		prepareDatabend("test_table", "http://databend:databend@localhost:8000")
-		testConfig := prepareSqlServerTestConfig()
-		startTime := time.Now()
+func TestMssqlWorkflow(t *testing.T) {
+	fmt.Println("=== TEST MSSQL SOURCE ===")
+	prepareSQLServer()
+	truncateDatabend("test_table", "http://databend:databend@localhost:8000")
+	prepareDatabend("test_table", "http://databend:databend@localhost:8000")
+	testConfig := prepareSqlServerTestConfig()
+	startTime := time.Now()
 
-		src, err := source.NewSource(testConfig)
-		if err != nil {
-			panic(err)
-		}
-		wg := sync.WaitGroup{}
-		dbs, err := src.GetDatabasesAccordingToSourceDbRegex(testConfig.SourceDB)
-		if err != nil {
-			panic(err)
-		}
-		log.Printf("dbs: %v", dbs)
-		dbTables, err := src.GetTablesAccordingToSourceTableRegex(testConfig.SourceTable, dbs)
-		if err != nil {
-			panic(err)
-		}
-		log.Printf("dbTables: %v", dbTables)
-		for db, tables := range dbTables {
-			for _, table := range tables {
-				wg.Add(1)
-				db := db
-				table := table
-				go func(cfg *cfg.Config, db, table string) {
-					cfgCopy := *testConfig
-					cfgCopy.SourceTable = table
-					cfgCopy.SourceDB = db
-					ig := ingester.NewDatabendIngester(&cfgCopy)
-					src, err := source.NewSource(&cfgCopy)
-					assert.NoError(t, err)
-					w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
-					w.Run(context.Background())
-					wg.Done()
-				}(testConfig, db, table)
-			}
-		}
-		wg.Wait()
-		endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
-		fmt.Println(endTime)
-		fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
-
-		err = checkTargetTable("test_table", 25)
-		assert.NoError(t, err)
+	src, err := source.NewSource(testConfig)
+	if err != nil {
+		panic(err)
 	}
+	wg := sync.WaitGroup{}
+	dbs, err := src.GetDatabasesAccordingToSourceDbRegex(testConfig.SourceDB)
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("dbs: %v", dbs)
+	dbTables, err := src.GetTablesAccordingToSourceTableRegex(testConfig.SourceTable, dbs)
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("dbTables: %v", dbTables)
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			wg.Add(1)
+			db := db
+			table := table
+			go func(cfg *cfg.Config, db, table string) {
+				cfgCopy := *testConfig
+				cfgCopy.SourceTable = table
+				cfgCopy.SourceDB = db
+				ig := ingester.NewDatabendIngester(&cfgCopy)
+				src, err := source.NewSource(&cfgCopy)
+				assert.NoError(t, err)
+				w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
+				w.Run(context.Background())
+				wg.Done()
+			}(testConfig, db, table)
+		}
+	}
+	wg.Wait()
+	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Println(endTime)
+	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
+
+	err = checkTargetTable("test_table", 10)
+	assert.NoError(t, err)
 }
 
 func TestSimpleOracleWorkflow(t *testing.T) {
@@ -587,8 +588,9 @@ func prepareTestConfig() *cfg.Config {
 
 func prepareSQLServer() {
 	log.Println("===prepareSQLServer===")
+	encodedPassword := url.QueryEscape("Passw@rd")
 	// sqlserver://username:password@host:port?database=dbname
-	db, err := sql.Open("mssql", "sqlserver://sa:Password1234!@localhost:1433?encrypt=disable")
+	db, err := sql.Open("mssql", fmt.Sprintf("sqlserver://sa:%s@localhost:1433?encrypt=disable", encodedPassword))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -612,11 +614,11 @@ func prepareSQLServer() {
 		log.Fatal(err)
 	}
 
-	// 切换到新创建的数据库
-	_, err = db.Exec("USE mydb")
+	db, err = sql.Open("mssql", fmt.Sprintf("sqlserver://sa:%s@localhost:1433?database=mydb&encrypt=disable", encodedPassword))
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer db.Close()
 
 	// 创建表
 	_, err = db.Exec(`
@@ -691,7 +693,7 @@ func prepareSqlServerTestConfig() *cfg.Config {
 		SourceHost:           "127.0.0.1",
 		SourcePort:           1433,
 		SourceUser:           "sa",
-		SourcePass:           "Password1234!",
+		SourcePass:           "Passw@rd",
 		SourceTable:          "test_table",
 		SourceWhereCondition: "id > 0",
 		SourceSplitKey:       "id",

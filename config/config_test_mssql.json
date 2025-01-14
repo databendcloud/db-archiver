@@ -11,7 +11,7 @@
   "sourceSplitKey": "id",
   "sourceSplitTimeKey": "",
   "timeSplitUnit": "minute",
-  "databendDSN": "https://user:password@host.databend.com:443",
+  "databendDSN": "https://user:pass@host.databend.com:443",
   "databendTable": "testSync.test1",
   "batchSize": 2,
   "batchMaxInterval": 30,

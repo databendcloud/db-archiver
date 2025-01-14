@@ -318,9 +318,9 @@ func (s *SQLServerSource) QueryTableData(threadNum int, conditionSql string) ([]
 			batchSize)
 
 		// 设置查询超时
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
 		rows, err := s.db.QueryContext(ctx, query)
-		cancel()
 
 		if err != nil {
 			return nil, nil, fmt.Errorf("executing batch query at offset %d: %w", offset, err)
@@ -357,7 +357,11 @@ func (s *SQLServerSource) QueryTableData(threadNum int, conditionSql string) ([]
 					}
 				case *sql.NullBool:
 					if v.Valid {
-						row[i] = v.Bool
+						if v.Bool {
+							row[i] = 1 // target databend bool is int8
+						} else {
+							row[i] = 0
+						}
 					} else {
 						row[i] = nil
 					}
@@ -480,6 +484,7 @@ func (s *SQLServerSource) GetTablesAccordingToSourceTableRegex(sourceTablePatter
 
 			// 构建完整的表名（包含schema）
 			fullTableName := fmt.Sprintf("%s.%s", schemaName, tableName)
+			fmt.Println("full name table:", fullTableName)
 
 			match, err := regexp.MatchString(sourceTablePattern, fullTableName)
 			if err != nil {
@@ -488,6 +493,7 @@ func (s *SQLServerSource) GetTablesAccordingToSourceTableRegex(sourceTablePatter
 			}
 
 			if match {
+				fmt.Println("match table:", fullTableName)
 				tables = append(tables, fullTableName)
 			}
 		}
@@ -499,6 +505,8 @@ func (s *SQLServerSource) GetTablesAccordingToSourceTableRegex(sourceTablePatter
 
 		dbTables[database] = tables
 	}
+
+	fmt.Println("dbTables:", dbTables)
 
 	return dbTables, nil
 }
