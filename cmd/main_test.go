@@ -157,10 +157,12 @@ func TestWorkFlow(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
+		log.Printf("dbs: %v", dbs)
 		dbTables, err := src.GetTablesAccordingToSourceTableRegex(testConfig.SourceTable, dbs)
 		if err != nil {
 			panic(err)
 		}
+		log.Printf("dbTables: %v", dbTables)
 		for db, tables := range dbTables {
 			for _, table := range tables {
 				wg.Add(1)
@@ -584,7 +586,8 @@ func prepareTestConfig() *cfg.Config {
 }
 
 func prepareSQLServer() {
-	// 连接字符串格式：sqlserver://username:password@host:port?database=dbname
+	log.Println("===prepareSQLServer===")
+	// sqlserver://username:password@host:port?database=dbname
 	db, err := sql.Open("mssql", "sqlserver://sa:Password1234!@localhost:1433?encrypt=disable")
 	if err != nil {
 		log.Fatal(err)
@@ -650,6 +653,7 @@ func prepareSQLServer() {
 			log.Fatal(err)
 		}
 	}
+	log.Println("===prepareSQLServer done.===")
 }
 
 func prepareOracleTestConfig() *cfg.Config {
