@@ -192,6 +192,56 @@ func TestMssqlWorkflow(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestMssqlTimeKeyWorkflow(t *testing.T) {
+	fmt.Println("=== TEST MSSQL SOURCE WITH TIME KEY ===")
+	prepareSQLServer()
+	truncateDatabend("test_table", "http://databend:databend@localhost:8000")
+	prepareDatabend("test_table", "http://databend:databend@localhost:8000")
+	testConfig := prepareSqlServerTimeKeyTestConfig()
+	startTime := time.Now()
+
+	src, err := source.NewSource(testConfig)
+	if err != nil {
+		panic(err)
+	}
+	wg := sync.WaitGroup{}
+	dbs, err := src.GetDatabasesAccordingToSourceDbRegex(testConfig.SourceDB)
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("dbs: %v", dbs)
+	dbTables, err := src.GetTablesAccordingToSourceTableRegex(testConfig.SourceTable, dbs)
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("dbTables: %v", dbTables)
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			wg.Add(1)
+			db := db
+			table := table
+			go func(cfg *cfg.Config, db, table string) {
+				cfgCopy := *testConfig
+				cfgCopy.SourceTable = table
+				cfgCopy.SourceDB = db
+				ig := ingester.NewDatabendIngester(&cfgCopy)
+				src, err := source.NewSource(&cfgCopy)
+				assert.NoError(t, err)
+				w := worker.NewWorker(&cfgCopy, fmt.Sprintf("%s.%s", db, table), ig, src)
+				w.Run(context.Background())
+				wg.Done()
+			}(testConfig, db, table)
+		}
+	}
+	wg.Wait()
+	endTime := fmt.Sprintf("end time: %s", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Println(endTime)
+	fmt.Println(fmt.Sprintf("total time: %s", time.Since(startTime)))
+
+	err = checkTargetTable("test_table", 10)
+	assert.NoError(t, err)
+}
+
 func TestSimpleOracleWorkflow(t *testing.T) {
 	t.Skip("skip test")
 	fmt.Println("=== TEST ORACLE SOURCE ===")
@@ -681,6 +731,34 @@ func prepareOracleTestConfig() *cfg.Config {
 		DisableVariantCheck:  false,
 		UserStage:            "~",
 		OracleSID:            "XE",
+	}
+
+	return &config
+}
+
+func prepareSqlServerTimeKeyTestConfig() *cfg.Config {
+	config := cfg.Config{
+		DatabaseType:         "mssql",
+		SourceDB:             "mydb",
+		SourceHost:           "127.0.0.1",
+		SourcePort:           1433,
+		SourceUser:           "sa",
+		SourcePass:           "Password1234!",
+		SourceTable:          "test_table",
+		SourceWhereCondition: "timestamp_col > '2024-06-29 00:00:00' and timestamp_col < '2024-07-10 20:00:00'",
+		SourceSplitKey:       "",
+		SourceSplitTimeKey:   "timestamp_col",
+		TimeSplitUnit:        "day",
+		DatabendDSN:          "http://databend:databend@localhost:8000",
+		DatabendTable:        "default.test_table",
+		BatchSize:            5,
+		BatchMaxInterval:     3,
+		MaxThread:            2,
+		CopyForce:            false,
+		CopyPurge:            false,
+		DeleteAfterSync:      false,
+		DisableVariantCheck:  false,
+		UserStage:            "~",
 	}
 
 	return &config
