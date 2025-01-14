@@ -596,7 +596,7 @@ func prepareSQLServer() {
 	}
 	defer db.Close()
 
-	// 删除已存在的数据库
+	// delete database
 	_, err = db.Exec(`
         IF EXISTS (SELECT * FROM sys.databases WHERE name = 'mydb')
         BEGIN
@@ -608,7 +608,7 @@ func prepareSQLServer() {
 		log.Fatal(err)
 	}
 
-	// 创建新数据库
+	// new database
 	_, err = db.Exec("CREATE DATABASE mydb")
 	if err != nil {
 		log.Fatal(err)
@@ -620,7 +620,7 @@ func prepareSQLServer() {
 	}
 	defer db.Close()
 
-	// 创建表
+	// create table
 	_, err = db.Exec(`
         CREATE TABLE test_table (
             id INT PRIMARY KEY,
@@ -638,7 +638,7 @@ func prepareSQLServer() {
 		log.Fatal(err)
 	}
 
-	// 插入数据
+	// insert 10 rows
 	for i := 1; i <= 10; i++ {
 		insert := fmt.Sprintf(`
             INSERT INTO test_table 

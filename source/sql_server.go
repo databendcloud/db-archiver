@@ -41,11 +41,10 @@ func NewSqlServerSource(cfg *config.Config) (*SQLServerSource, error) {
 }
 
 func (s *SQLServerSource) GetSourceReadRowsCount() (int, error) {
-	// SQL Server 的表名可能包含 schema，格式为 schema.table
-	// 如果表名已经包含了 schema（如 "dbo.tablename"），则直接使用
+	// SQL Server table name contains schema，格式为 schema.table
 	tableName := s.cfg.SourceTable
 	if !strings.Contains(tableName, ".") {
-		// 如果没有指定 schema，默认添加 dbo schema
+		// if no schema，default use dbo schema
 		tableName = "dbo." + tableName
 	}
 
@@ -65,13 +64,11 @@ func (s *SQLServerSource) GetSourceReadRowsCount() (int, error) {
 }
 
 func (s *SQLServerSource) GetMinMaxSplitKey() (int64, int64, error) {
-	// 处理表名
 	tableName := s.cfg.SourceTable
 	if !strings.Contains(tableName, ".") {
 		tableName = "dbo." + tableName
 	}
 
-	// SQL Server 的写法略有不同，但基本逻辑相同
 	query := fmt.Sprintf("SELECT MIN(%s) as min_key, MAX(%s) as max_key FROM %s.%s",
 		s.cfg.SourceSplitKey,
 		s.cfg.SourceSplitKey,
@@ -96,12 +93,10 @@ func (s *SQLServerSource) GetMinMaxSplitKey() (int64, int64, error) {
 		}
 	}
 
-	// 检查是否有错误发生
 	if err = rows.Err(); err != nil {
 		return 0, 0, err
 	}
 
-	// 检查值是否为 NULL
 	if !minSplitKey.Valid || !maxSplitKey.Valid {
 		return 0, 0, nil
 	}
@@ -132,7 +127,6 @@ func (s *SQLServerSource) AdjustBatchSizeAccordingToSourceDbTable() int64 {
 }
 
 func (s *SQLServerSource) GetMinMaxTimeSplitKey() (string, string, error) {
-	// 处理表名
 	parts := strings.Split(s.cfg.SourceTable, ".")
 	var tableName string
 	if len(parts) == 2 {
@@ -141,7 +135,6 @@ func (s *SQLServerSource) GetMinMaxTimeSplitKey() (string, string, error) {
 		tableName = fmt.Sprintf("[dbo].[%s]", s.cfg.SourceTable)
 	}
 
-	// SQL Server 的日期时间格式化
 	query := fmt.Sprintf(`
         SELECT 
             CONVERT(VARCHAR(23), MIN([%s]), 126) as min_key, 
@@ -172,12 +165,10 @@ func (s *SQLServerSource) GetMinMaxTimeSplitKey() (string, string, error) {
 		return "", "", fmt.Errorf("no results returned")
 	}
 
-	// 检查是否有错误发生
 	if err = rows.Err(); err != nil {
 		return "", "", fmt.Errorf("reading rows: %w", err)
 	}
 
-	// 处理 NULL 值
 	if !minSplitKey.Valid || !maxSplitKey.Valid {
 		return "", "", nil
 	}
@@ -190,7 +181,6 @@ func (s *SQLServerSource) DeleteAfterSync() error {
 		return nil
 	}
 
-	// 处理表名
 	parts := strings.Split(s.cfg.SourceTable, ".")
 	var tableName string
 	if len(parts) == 2 {
@@ -199,7 +189,6 @@ func (s *SQLServerSource) DeleteAfterSync() error {
 		tableName = fmt.Sprintf("[dbo].[%s]", s.cfg.SourceTable)
 	}
 
-	// 构建删除语句
 	query := fmt.Sprintf("DELETE FROM [%s].%s",
 		s.cfg.SourceDB,
 		tableName)
@@ -219,7 +208,6 @@ func (s *SQLServerSource) DeleteAfterSync() error {
 func (s *SQLServerSource) QueryTableData(threadNum int, conditionSql string) ([][]interface{}, []string, error) {
 	startTime := time.Now()
 
-	// 处理表名
 	parts := strings.Split(s.cfg.SourceTable, ".")
 	var tableName string
 	if len(parts) == 2 {
@@ -228,20 +216,18 @@ func (s *SQLServerSource) QueryTableData(threadNum int, conditionSql string) ([]
 		tableName = fmt.Sprintf("[dbo].[%s]", s.cfg.SourceTable)
 	}
 
-	// 获取列信息的基础查询
 	baseQuery := fmt.Sprintf(`
         SELECT TOP 1 * 
         FROM [%s].%s WITH (NOLOCK)
         WHERE %s`,
 		s.cfg.SourceDB,
 		tableName,
-		conditionSql)
+		strings.Split(conditionSql, "OFFSET")[0])
 
 	if s.cfg.SourceWhereCondition != "" && s.cfg.SourceSplitKey != "" {
 		baseQuery = fmt.Sprintf("%s AND %s", baseQuery, s.cfg.SourceWhereCondition)
 	}
 
-	// 先执行一次查询来获取列信息
 	rows, err := s.db.Query(baseQuery)
 	if err != nil {
 		return nil, nil, fmt.Errorf("executing base query: %w", err)
@@ -260,7 +246,7 @@ func (s *SQLServerSource) QueryTableData(threadNum int, conditionSql string) ([]
 	}
 	rows.Close()
 
-	// 准备扫描参数
+	// scan value
 	scanArgs := make([]interface{}, len(columns))
 	for i, columnType := range columnTypes {
 		switch columnType.DatabaseTypeName() {
@@ -285,13 +271,11 @@ func (s *SQLServerSource) QueryTableData(threadNum int, conditionSql string) ([]
 		}
 	}
 
-	// 分批查询设置
 	const batchSize = 10000
 	var result [][]interface{}
 	offset := 0
 
 	for {
-		// 构建分页查询
 		query := fmt.Sprintf(`
             SELECT *
             FROM [%s].%s WITH (NOLOCK)
@@ -304,7 +288,7 @@ func (s *SQLServerSource) QueryTableData(threadNum int, conditionSql string) ([]
 			query = fmt.Sprintf("%s AND %s", query, s.cfg.SourceWhereCondition)
 		}
 
-		// 添加分页
+		// page
 		query = fmt.Sprintf(`
             SELECT *
             FROM (
@@ -317,7 +301,6 @@ func (s *SQLServerSource) QueryTableData(threadNum int, conditionSql string) ([]
 			offset,
 			batchSize)
 
-		// 设置查询超时
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 		rows, err := s.db.QueryContext(ctx, query)
@@ -385,14 +368,13 @@ func (s *SQLServerSource) QueryTableData(threadNum int, conditionSql string) ([]
 			return nil, nil, fmt.Errorf("reading rows at offset %d: %w", offset, err)
 		}
 
-		// 如果获取的行数少于批次大小，说明已经读取完所有数据
+		// if the number of rows returned is less than the batch size, we can assume that we've reached the end of the data
 		if rowCount < batchSize {
 			break
 		}
 
 		offset += batchSize
 
-		// 记录进度
 		log.Printf("thread-%d: processed %d rows so far", threadNum, len(result))
 	}
 
@@ -404,7 +386,7 @@ func (s *SQLServerSource) QueryTableData(threadNum int, conditionSql string) ([]
 }
 
 func (s *SQLServerSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern string) ([]string, error) {
-	// SQL Server 使用系统视图查询数据库列表
+	// SQL Server use system view to get databases
 	query := `
         SELECT name 
         FROM sys.databases 
@@ -451,7 +433,6 @@ func (s *SQLServerSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePat
 func (s *SQLServerSource) GetTablesAccordingToSourceTableRegex(sourceTablePattern string, databases []string) (map[string][]string, error) {
 	dbTables := make(map[string][]string)
 
-	// 查询表的基本SQL
 	baseQuery := `
         SELECT 
             SCHEMA_NAME(schema_id) as schema_name,
@@ -462,7 +443,7 @@ func (s *SQLServerSource) GetTablesAccordingToSourceTableRegex(sourceTablePatter
         ORDER BY schema_name, name`
 
 	for _, database := range databases {
-		// 切换数据库上下文
+		// switch db
 		_, err := s.db.Exec(fmt.Sprintf("USE [%s]", database))
 		if err != nil {
 			return nil, fmt.Errorf("switching to database %s: %w", database, err)
@@ -482,7 +463,7 @@ func (s *SQLServerSource) GetTablesAccordingToSourceTableRegex(sourceTablePatter
 				return nil, fmt.Errorf("scanning table info in database %s: %w", database, err)
 			}
 
-			// 构建完整的表名（包含schema）
+			// schema.tablename, example: dbo.table1
 			fullTableName := fmt.Sprintf("%s.%s", schemaName, tableName)
 			fmt.Println("full name table:", fullTableName)
 
@@ -520,7 +501,6 @@ func (s *SQLServerSource) GetAllSourceReadRowsCount() (int, error) {
 	}
 
 	for db, tables := range dbTables {
-		// 切换数据库上下文
 		_, err := s.db.Exec(fmt.Sprintf("USE [%s]", db))
 		if err != nil {
 			return 0, fmt.Errorf("switching to database %s: %w", db, err)
@@ -543,7 +523,6 @@ func (s *SQLServerSource) GetAllSourceReadRowsCount() (int, error) {
 		}
 	}
 
-	// 处理单表场景
 	if allCount == 0 && len(dbTables) == 0 && s.cfg.SourceTable != "" {
 		count, err := s.GetSourceReadRowsCount()
 		if err != nil {
@@ -559,34 +538,29 @@ func (s *SQLServerSource) GetDbTablesAccordingToSourceDbTables() (map[string][]s
 	allDbTables := make(map[string][]string)
 
 	for _, sourceDbTable := range s.cfg.SourceDbTables {
-		// 使用 @ 分割数据库和表模式
 		dbTable := strings.Split(sourceDbTable, "@")
 		if len(dbTable) != 2 {
 			return nil, fmt.Errorf("invalid sourceDbTable: %s, should be database@schema.table format", sourceDbTable)
 		}
 
-		// 获取匹配的数据库
 		dbs, err := s.GetDatabasesAccordingToSourceDbRegex(dbTable[0])
 		if err != nil {
 			return nil, fmt.Errorf("get databases according to sourceDbRegex failed: %w", err)
 		}
 
-		// 如果没有匹配的数据库，记录警告并继续
 		if len(dbs) == 0 {
 			log.Printf("Warning: No databases match pattern %s", dbTable[0])
 			continue
 		}
 
-		// 获取匹配的表
+		// match table
 		dbTables, err := s.GetTablesAccordingToSourceTableRegex(dbTable[1], dbs)
 		if err != nil {
 			return nil, fmt.Errorf("get tables according to sourceTableRegex failed: %w", err)
 		}
 
-		// 合并结果
 		for db, tables := range dbTables {
 			if existingTables, ok := allDbTables[db]; ok {
-				// 检查重复
 				tableSet := make(map[string]struct{})
 				for _, t := range existingTables {
 					tableSet[t] = struct{}{}

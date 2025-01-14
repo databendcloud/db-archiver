@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -163,7 +164,14 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 			}
 			for _, condition := range conditions {
 				logrus.Infof("condition: %s", condition)
-				err := w.stepBatchWithTimeCondition(condition, w.Cfg.BatchSize)
+				switch w.Cfg.DatabaseType {
+				case "mysql":
+					err = w.stepBatchWithTimeCondition(condition, w.Cfg.BatchSize)
+				case "mssql":
+					err = w.stepBatchWithTimeConditionMssql(condition, w.Cfg.BatchSize)
+				default:
+					err = w.stepBatchWithTimeCondition(condition, w.Cfg.BatchSize)
+				}
 				if err != nil {
 					logrus.Errorf("stepBatchWithCondition failed: %v", err)
 				}
@@ -199,6 +207,36 @@ func (w *Worker) stepBatchWithTimeCondition(conditionSql string, batchSize int64
 	return nil
 }
 
+func (w *Worker) stepBatchWithTimeConditionMssql(conditionSql string, batchSize int64) error {
+	var offset int64 = 0
+	conditionSql = ensureOrderBy(conditionSql)
+	fmt.Println("conditionSql", conditionSql)
+	for {
+		batchSql := fmt.Sprintf("%s OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", conditionSql, offset, batchSize)
+
+		data, columns, err := w.Src.QueryTableData(1, batchSql)
+		if err != nil {
+			return err
+		}
+
+		if len(data) == 0 {
+			break
+		}
+
+		err = w.Ig.DoRetry(
+			func() error {
+				return w.Ig.IngestData(1, columns, data)
+			})
+		if err != nil {
+			logrus.Errorf("Failed to ingest data between %s into Databend: %v", conditionSql, err)
+			return err
+		}
+
+		offset += batchSize
+	}
+	return nil
+}
+
 func (w *Worker) IsWorkerCorrect() (int, int, bool) {
 	syncedCount, err := w.Ig.GetAllSyncedCount()
 	if err != nil {
@@ -228,4 +266,11 @@ func (w *Worker) Run(ctx context.Context) {
 			logrus.Errorf("stepBatch failed: %v", err)
 		}
 	}
+}
+
+func ensureOrderBy(conditionSql string) string {
+	if !strings.Contains(strings.ToLower(conditionSql), "order by") {
+		conditionSql += " ORDER BY id"
+	}
+	return conditionSql
 }

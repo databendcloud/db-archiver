@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/denisenkom/go-mssqldb"
@@ -128,14 +129,20 @@ func SplitTimeConditionsByMaxThread(conditions []string, maxThread int) [][]stri
 
 func SplitConditionAccordingToTimeSplitKey(cfg *config.Config, minTimeSplitKey, maxTimeSplitKey string) ([]string, error) {
 	var conditions []string
+	var layout string
+	if strings.Contains(minTimeSplitKey, "Z") || strings.Contains(minTimeSplitKey, "+") {
+		layout = "2006-01-02T15:04:05.000Z07:00"
+	} else {
+		layout = "2006-01-02T15:04:05.000"
+	}
 
 	// Parse the time strings
-	minTime, err := time.Parse("2006-01-02 15:04:05", minTimeSplitKey)
+	minTime, err := time.Parse(layout, minTimeSplitKey)
 	if err != nil {
 		return nil, err
 	}
 
-	maxTime, err := time.Parse("2006-01-02 15:04:05", maxTimeSplitKey)
+	maxTime, err := time.Parse(layout, maxTimeSplitKey)
 	if err != nil {
 		return nil, err
 	}
