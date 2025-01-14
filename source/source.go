@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	_ "github.com/denisenkom/go-mssqldb"
@@ -129,20 +128,14 @@ func SplitTimeConditionsByMaxThread(conditions []string, maxThread int) [][]stri
 
 func SplitConditionAccordingToTimeSplitKey(cfg *config.Config, minTimeSplitKey, maxTimeSplitKey string) ([]string, error) {
 	var conditions []string
-	var layout string
-	if strings.Contains(minTimeSplitKey, "Z") || strings.Contains(minTimeSplitKey, "+") {
-		layout = "2006-01-02T15:04:05.000Z07:00"
-	} else {
-		layout = "2006-01-02T15:04:05.000"
-	}
 
 	// Parse the time strings
-	minTime, err := time.Parse(layout, minTimeSplitKey)
+	minTime, err := parseTimeDynamic(minTimeSplitKey)
 	if err != nil {
 		return nil, err
 	}
 
-	maxTime, err := time.Parse(layout, maxTimeSplitKey)
+	maxTime, err := parseTimeDynamic(maxTimeSplitKey)
 	if err != nil {
 		return nil, err
 	}
@@ -219,4 +212,24 @@ func generateNDJsonFile(batchJsonData []string) (string, int, error) {
 		return "", 0, err
 	}
 	return outputFile.Name(), bytesSum, err
+}
+
+func parseTimeDynamic(timeStr string) (time.Time, error) {
+	var layouts = []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05.000",
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04:05.000Z07:00",
+	}
+
+	var err error
+	var parsedTime time.Time
+	for _, layout := range layouts {
+		parsedTime, err = time.Parse(layout, timeStr)
+		if err == nil {
+			return parsedTime, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("failed to parse time: %v", err)
 }
