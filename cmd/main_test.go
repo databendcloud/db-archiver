@@ -753,7 +753,7 @@ func prepareSqlServerTimeKeyTestConfig() *cfg.Config {
 		DatabendTable:        "default.test_table",
 		BatchSize:            5,
 		BatchMaxInterval:     3,
-		MaxThread:            2,
+		MaxThread:            1,
 		CopyForce:            false,
 		CopyPurge:            false,
 		DeleteAfterSync:      false,

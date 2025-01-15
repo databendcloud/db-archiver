@@ -63,7 +63,7 @@ type Config struct {
 	DisableVariantCheck bool   `json:"disableVariantCheck" default:"true"`
 	UserStage           string `json:"userStage" default:"~"`
 	DeleteAfterSync     bool   `json:"deleteAfterSync" default:"false"`
-	MaxThread           int    `json:"maxThread" default:"2"`
+	MaxThread           int    `json:"maxThread" default:"1"`
 	// Oracle
 	OracleSID string `json:"oracleSID"`
 }

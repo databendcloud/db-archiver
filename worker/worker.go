@@ -154,7 +154,7 @@ func (w *Worker) StepBatchByTimeSplitKey() error {
 	fmt.Println(len(slimedRange))
 	fmt.Println("slimedRange", slimedRange)
 	wg.Add(w.Cfg.MaxThread)
-	for i := 0; i < w.Cfg.MaxThread; i++ {
+	for i := 0; i < 1; i++ {
 		go func(idx int) {
 			defer wg.Done()
 			conditions := slimedRange[idx]
