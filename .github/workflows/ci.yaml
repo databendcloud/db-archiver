@@ -33,6 +33,13 @@ jobs:
           ORACLE_SID: XE
         ports:
           - 49161:1521
+      mssql:
+        image : mcr.microsoft.com/azure-sql-edge:latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: "Password1234!"
+        ports:
+          - 1433:1433
 
     steps:
       - name: Checkout
@@ -62,17 +69,17 @@ jobs:
           rm instantclient-basic-linux.x64-21.4.0.0.0dbru.zip
           rm instantclient-sqlplus-linux.x64-21.4.0.0.0dbru.zip
 
-      - name: Create Oracle User
-        env:
-          TEST_DATABEND_DSN: "http://databend:databend@localhost:8000"
-          LD_LIBRARY_PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH
-          PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH:$PATH
-        run: |
-          sqlplus system/oracle@localhost:49161/XE << EOF
-          CREATE USER a IDENTIFIED BY 123 DEFAULT TABLESPACE USERS;
-          GRANT DBA TO a;
-          EXIT
-          EOF
+#      - name: Create Oracle User
+#        env:
+#          TEST_DATABEND_DSN: "http://databend:databend@localhost:8000"
+#          LD_LIBRARY_PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH
+#          PATH: /opt/oracle/instantclient_21_4:$LD_LIBRARY_PATH:$PATH
+#        run: |
+#          sqlplus system/oracle@localhost:49161/XE << EOF
+#          CREATE USER a IDENTIFIED BY 123 DEFAULT TABLESPACE USERS;
+#          GRANT DBA TO a;
+#          EXIT
+#          EOF
 
       - name: Test
         env:
