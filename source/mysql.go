@@ -117,14 +117,48 @@ func (s *MysqlSource) GetMinMaxTimeSplitKey() (string, string, error) {
 }
 
 func (s *MysqlSource) DeleteAfterSync() error {
-	if s.cfg.DeleteAfterSync {
-		_, err := s.db.Exec(fmt.Sprintf("delete from %s.%s where %s", s.cfg.SourceDB,
-			s.cfg.SourceTable, s.cfg.SourceWhereCondition))
-		if err != nil {
-			return err
+	if !s.cfg.DeleteAfterSync {
+		return nil
+	}
+
+	dbTables, err := s.GetDbTablesAccordingToSourceDbTables()
+	if err != nil {
+		return err
+	}
+
+	for db, tables := range dbTables {
+		for _, table := range tables {
+			count, err := s.GetSourceReadRowsCount()
+			if err != nil {
+				log.Printf("Error getting row count for table %s.%s: %v", db, table, err)
+				continue
+			}
+
+			// Delete in batches
+			for count > 0 {
+				limit := min(int(s.cfg.BatchSize), count)
+				query := fmt.Sprintf("DELETE FROM %s.%s WHERE %s LIMIT %d", db, table, s.cfg.SourceWhereCondition, limit)
+				_, err := s.db.Exec(query)
+				if err != nil {
+					log.Printf("Error deleting rows from table %s.%s: %v", db, table, err)
+					break
+				}
+				count -= limit
+				log.Printf("Deleted %d rows from table %s.%s\n", limit, db, table)
+				time.Sleep(time.Duration(s.cfg.BatchMaxInterval) * time.Second)
+			}
 		}
 	}
+
 	return nil
+}
+
+// Utility function to get the smaller of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (s *MysqlSource) QueryTableData(threadNum int, conditionSql string) ([][]interface{}, []string, error) {

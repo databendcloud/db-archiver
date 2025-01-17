@@ -58,11 +58,13 @@ func main() {
 			panic(err)
 		}
 	} else {
-		dbs, err := src.GetDatabasesAccordingToSourceDbRegex(cfg.SourceDB)
+		dbName := fmt.Sprintf("^%s$", cfg.SourceDB)
+		dbs, err := src.GetDatabasesAccordingToSourceDbRegex(dbName)
 		if err != nil {
 			panic(err)
 		}
-		dbTables, err = src.GetTablesAccordingToSourceTableRegex(cfg.SourceTable, dbs)
+		tableName := fmt.Sprintf("^%s$", cfg.SourceTable)
+		dbTables, err = src.GetTablesAccordingToSourceTableRegex(tableName, dbs)
 		if err != nil {
 			panic(err)
 		}
