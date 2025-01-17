@@ -9,10 +9,12 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	go_ora "github.com/sijms/go-ora/v2"
 	"github.com/sirupsen/logrus"
 
+	_ "github.com/sijms/go-ora/v2"
+
 	"github.com/databendcloud/db-archiver/config"
-	_ "github.com/godror/godror"
 )
 
 type OracleSource struct {
@@ -52,14 +54,12 @@ func NewOracleSource(cfg *config.Config) (*OracleSource, error) {
 	if cfg.SSLMode == "" {
 		cfg.SSLMode = "disable"
 	}
-	db, err := sql.Open("godror", fmt.Sprintf("oracle://%s:%s@%s:%d/%s?service_name=%s&sslmode=%s",
-		cfg.SourceUser,
-		cfg.SourcePass,
-		cfg.SourceHost,
-		cfg.SourcePort,
-		cfg.OracleSID,
-		cfg.SourceDB,
-		cfg.SSLMode))
+	params := map[string]string{
+		"sslmode": cfg.SSLMode, // 启用 SSL 并验证服务器证书
+	}
+	connStr := go_ora.BuildUrl(cfg.SourceHost, cfg.SourcePort, cfg.SourceDB, cfg.SourceUser, cfg.SourcePass, params)
+
+	db, err := sql.Open("oracle", connStr)
 	if err != nil {
 		logrus.Errorf("failed to open oracle db: %v", err)
 		return nil, err
@@ -81,16 +81,13 @@ func (p *OracleSource) SwitchDatabase() error {
 	if err != nil {
 		return err
 	}
+	params := map[string]string{
+		"sslmode": p.cfg.SSLMode,
+	}
+	connStr := go_ora.BuildUrl(p.cfg.SourceHost, p.cfg.SourcePort, p.cfg.SourceDB, p.cfg.SourceUser, p.cfg.SourcePass, params)
 
 	// Open a new connection to the new database
-	db, err := sql.Open("godror", fmt.Sprintf("oracle://%s:%s@%s:%d/%s?service_name=%s&sslmode=%s",
-		p.cfg.SourceUser,
-		p.cfg.SourcePass,
-		p.cfg.SourceHost,
-		p.cfg.SourcePort,
-		p.cfg.OracleSID,
-		p.cfg.SourceDB,
-		p.cfg.SSLMode))
+	db, err := sql.Open("oracle", connStr)
 	if err != nil {
 		return err
 	}

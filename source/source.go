@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
 
@@ -36,6 +37,8 @@ func NewSource(cfg *config.Config) (Sourcer, error) {
 		return NewPostgresSource(cfg)
 	case "oracle":
 		return NewOracleSource(cfg)
+	case "mssql":
+		return NewSqlServerSource(cfg)
 	default:
 		return NewMysqlSource(cfg)
 	}
@@ -127,12 +130,12 @@ func SplitConditionAccordingToTimeSplitKey(cfg *config.Config, minTimeSplitKey, 
 	var conditions []string
 
 	// Parse the time strings
-	minTime, err := time.Parse("2006-01-02 15:04:05", minTimeSplitKey)
+	minTime, err := parseTimeDynamic(minTimeSplitKey)
 	if err != nil {
 		return nil, err
 	}
 
-	maxTime, err := time.Parse("2006-01-02 15:04:05", maxTimeSplitKey)
+	maxTime, err := parseTimeDynamic(maxTimeSplitKey)
 	if err != nil {
 		return nil, err
 	}
@@ -209,4 +212,24 @@ func generateNDJsonFile(batchJsonData []string) (string, int, error) {
 		return "", 0, err
 	}
 	return outputFile.Name(), bytesSum, err
+}
+
+func parseTimeDynamic(timeStr string) (time.Time, error) {
+	var layouts = []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05.000",
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04:05.000Z07:00",
+	}
+
+	var err error
+	var parsedTime time.Time
+	for _, layout := range layouts {
+		parsedTime, err = time.Parse(layout, timeStr)
+		if err == nil {
+			return parsedTime, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("failed to parse time: %v", err)
 }
