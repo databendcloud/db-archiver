@@ -88,6 +88,9 @@ func LoadConfig(configFile string) (*Config, error) {
 }
 
 func preCheckConfig(cfg *Config) {
+	if cfg.UserStage == "" {
+		cfg.UserStage = "~"
+	}
 	if cfg.SourceSplitKey != "" && cfg.SourceSplitTimeKey != "" {
 		panic("cannot set both sourceSplitKey and sourceSplitTimeKey")
 	}
