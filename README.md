@@ -7,6 +7,7 @@ A simple tool to archive databases to Databend.
 | MySQL       |     Yes     |
 | PostgreSQL  |     Yes     |
 | TiDB        |     Yes     |
+| SQL Server  |     Yes     |
 | Oracle      | Coming soon |
 | CSV         | Coming soon |
 | NDJSON      | Coming soon |
@@ -14,7 +15,7 @@ A simple tool to archive databases to Databend.
 
 ## Installation
 ```bash
-go install github.com/databend/db-archiver@latest
+ go install github.com/databendcloud/db-archiver/cmd@latest
 ```
 
 ## Usage
