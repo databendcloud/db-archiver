@@ -14,9 +14,7 @@ A simple tool to archive databases to Databend.
 
 
 ## Installation
-```bash
- go install github.com/databendcloud/db-archiver/cmd@latest
-```
+Download the binary from [release page](https://github.com/databendcloud/db-archiver/releases) according to your arch.
 
 ## Usage
 
@@ -27,20 +25,18 @@ Config your database and Databend connection in `config/conf.json`:
   "sourcePort": 3306,
   "sourceUser": "root",
   "sourcePass": "123456",
-  "sourceDB": "mydb",
-  "sourceTable": "my_table",
   "sourceDbTables": ["mydb.*@table.*"],
   "sourceQuery": "select * from mydb.my_table",
   "sourceWhereCondition": "id < 100",
   "sourceSplitKey": "id",
-  "databendDSN": "https://cloudapp:password@tn3ftqihs--medium-p8at.gw.aws-us-east-2.default.databend.com:443",
+  "databendDSN": "http://username:password@host:port",
   "databendTable": "testSync.my_table",
-  "batchSize": 2,
+  "batchSize": 20000,
   "batchMaxInterval": 30,
   "workers": 1,
-  "copyPurge": false,
+  "copyPurge": true,
   "copyForce": false,
-  "disableVariantCheck": false,
+  "disableVariantCheck": true,
   "userStage": "~",
   "deleteAfterSync": false
 }
@@ -70,10 +66,10 @@ INFO[0000] Starting worker
 | sourcePort           | source port              | 3306     | 3306                          | true     |
 | sourceUser           | source user              |          |                               | true     |
 | sourcePass           | source password          |          |                               | true     |
-| sourceDB             | source database          |          |                               | true     |
-| sourceTable          | source table             |          |                               | true     |
-| SourceDbTables       | source db tables         | []       | [db.*@table.*,mydb.*.table.*] | false    |
-| sourceQuery          | source query             |          |                               | true     |
+| sourceDB             | source database          |          |                               | false     |
+| sourceTable          | source table             |          |                               | false     |
+| sourceDbTables       | source db tables         | []       | [db.*@table.*,mydb.*.table.*] | false    |
+| sourceQuery          | source query             |          |                               | false     |
 | sourceWhereCondition | source where condition   |          |                               | false    |
 | sourceSplitKey       | source split key         | no       | "id"                          | false    |
 | sourceSplitTimeKey   | source split time key    | no       | "t1"                          | false    |
@@ -91,6 +87,7 @@ The `sourceSplitTimeKey` is used to split the data by the time column. And the `
 2. `sourceDbTables` is used to sync the data from multiple tables. The format is `db.*@table.*` or `db.table.*`. The `.*` is a regex pattern. The `db.*@table.*` means all tables match the regex pattern `table.*` in the database match the regex pattern `db.*`. 
 3. `sourceDbTables` has a higher priority than `sourceTable` and `sourceDB`. If `sourceDbTables` is set, the `sourceTable` will be ignored.
 4. The `database` and `table` all support regex pattern. 
+5. If you set `sourceDbTables` the `sourceQuery` no need to set. In other words, the proirity of `sourceDbTables` if high than `sourceQuery`.
 
 
 ## Two modes
@@ -141,15 +138,17 @@ The example of the `conf.json`:
   "timeSplitUnit": "hour",
   "databendDSN": "https://cloudapp:password@tn3ftqihs--medium-p8at.gw.aws-us-east-2.default.databend.com:443",
   "databendTable": "default.test_table1",
-  "batchSize": 2,
+  "batchSize": 10000,
   "batchMaxInterval": 30,
-  "copyPurge": false,
+  "copyPurge": true,
   "copyForce": false,
-  "disableVariantCheck": false,
+  "disableVariantCheck": true,
   "userStage": "~",
   "deleteAfterSync": false,
   "maxThread": 10
 ```
+NOTE:
+1. If you set `sourceSplitTimeKey` the `sourceWhereCondition` format must be `t > xx and t < yy`.
 
 
 NOTE: The `mysql-go` will handle the bool type as TINYINT(1). So you need to use `TINYINT` in databend to store the bool type.
