@@ -11,7 +11,7 @@ env:
 
 jobs:
   build_and_upload:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         TARGETS: [ linux/amd64, darwin/amd64, windows/amd64, linux/arm64, darwin/arm64 ]
