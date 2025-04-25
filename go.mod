@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/codesuki/go-time-series v0.0.0-20210430055340-c4c8d8fa61d4
-	github.com/datafuselabs/databend-go v0.6.6
+	github.com/datafuselabs/databend-go v0.7.4
 	github.com/denisenkom/go-mssqldb v0.12.3
 	github.com/fergusstrange/embedded-postgres v1.24.0
 	github.com/go-sql-driver/mysql v1.8.1
