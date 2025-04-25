@@ -11,8 +11,8 @@ github.com/benbjohnson/clock v1.3.5 h1:VvXlSJBzZpA/zum6Sj74hxwYI2DIxRWuNIoXAzHZz
 github.com/benbjohnson/clock v1.3.5/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/codesuki/go-time-series v0.0.0-20210430055340-c4c8d8fa61d4 h1:xKzsxCG6QVIh31ZIXuRR/eCvEflCFwpeET6cvTFYhVo=
 github.com/codesuki/go-time-series v0.0.0-20210430055340-c4c8d8fa61d4/go.mod h1:Rm6RJZPJg9b/vwne8fiAcfh0X5QFNszEhijK6d6qW9k=
-github.com/datafuselabs/databend-go v0.6.6 h1:xSXjvs1OSY3+gt/qAhejqX73Fw0Wy5eGE2CcIfIxapk=
-github.com/datafuselabs/databend-go v0.6.6/go.mod h1:L7+O9U82jOswFgChq5loljDsoI6TCHvbEsHIVmL+/6M=
+github.com/datafuselabs/databend-go v0.7.4 h1:B+qqK89TuGSDIdNgd3rxpUjYyTFBiyr5VE+7VYZkv0E=
+github.com/datafuselabs/databend-go v0.7.4/go.mod h1:h/sGUBZs7EqJgqnZ3XB0KHfyUlpGvfNrw2lWcdDJVIw=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
