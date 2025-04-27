@@ -60,27 +60,27 @@ INFO[0000] Starting worker
 
 
 ## Parameter References
-| Parameter            | Description              | Default  | example                       | required |
-|----------------------|--------------------------|----------|-------------------------------|----------|
-| sourceHost           | source host              |          |                               | true     |
-| sourcePort           | source port              | 3306     | 3306                          | true     |
-| sourceUser           | source user              |          |                               | true     |
-| sourcePass           | source password          |          |                               | true     |
-| sourceDB             | source database          |          |                               | false     |
-| sourceTable          | source table             |          |                               | false     |
-| sourceDbTables       | source db tables         | []       | [db.*@table.*,mydb.*.table.*] | false    |
-| sourceQuery          | source query             |          |                               | false     |
-| sourceWhereCondition | source where condition   |          |                               | false    |
-| sourceSplitKey       | source split key         | no       | "id"                          | false    |
-| sourceSplitTimeKey   | source split time key    | no       | "t1"                          | false    |
-| timeSplitUnit        | time split unit          | "minute" | "day"                         | false    |
-| databendDSN          | databend dsn             | no       | "http://localhost:8000"       | true     |
-| databendTable        | databend table           | no       | "db1.tbl"                     | true     |
-| batchSize            | batch size               | 1000     | 1000                          | false    |
-| copyPurge            | copy purge               | false    | false                         | false    |
-| copyForce            | copy force               | false    | false                         | false    |
-| DisableVariantCheck  | disable variant check    | false    | false                         | false    |
-| userStage            | user external stage name | ~        | ~                             | false    |
+| Parameter            | Description                                                                                          | Default  | example                       | required |
+|----------------------|------------------------------------------------------------------------------------------------------|----------|-------------------------------|----------|
+| sourceHost           | source host                                                                                          |          |                               | true     |
+| sourcePort           | source port                                                                                          | 3306     | 3306                          | true     |
+| sourceUser           | source user                                                                                          |          |                               | true     |
+| sourcePass           | source password                                                                                      |          |                               | true     |
+| sourceDB             | source database                                                                                      |          |                               | false     |
+| sourceTable          | source table                                                                                         |          |                               | false     |
+| sourceDbTables       | source db tables                                                                                     | []       | [db.*@table.*,mydb.*.table.*] | false    |
+| sourceQuery          | source query, which is query SQL to fetch data                                                       |          |                               | false     |
+| sourceWhereCondition | source where condition, the condition SQL to limit the query                                         |          |                               | false    |
+| sourceSplitKey       | source split key, the column name to split the data, must be integer type primary key                | no       | "id"                          | false    |                    | no       | "id"                          | false    |                                        | no       | "id"                          | false    |
+| sourceSplitTimeKey   | source split time key, the column name to split the data by time, must be time type                  | no       | "t1"                          | false    |
+| timeSplitUnit        | time split unit, the unit of time split, can be `minute`, `hour`, `day`                                                           | "minute" | "day"                         | false    |
+| databendDSN          | databend dsn                                                                                         | no       | "http://localhost:8000"       | true     |
+| databendTable        | databend table                                                                                       | no       | "db1.tbl"                     | true     |
+| batchSize            | batch size, the number of rows to sync in one batch                                                  | 1000     | 1000                          | false    |
+| copyPurge            | copy purge, refer to https://docs.databend.com/sql/sql-commands/dml/dml-copy-into-table#copy-options | false    | false                         | false    |
+| copyForce            | copy force                                                                                           | false    | false                         | false    |
+| DisableVariantCheck  | disable variant check                                                                                | false    | false                         | false    |
+| userStage            | user external stage name                                                                             | ~        | ~                             | false    |
 
 NOTE: 
 
@@ -94,6 +94,8 @@ The `sourceSplitTimeKey` is used to split the data by the time column. And the `
 4. The `database` and `table` all support regex pattern.
  
 5. If you set `sourceDbTables` the `sourceQuery` no need to set. In other words, the proirity of `sourceDbTables` if high than `sourceQuery`.
+
+6. The `copyPurge` and `copyForce`, `DisableVariantCheck` can found in this [doc](https://docs.databend.com/sql/sql-commands/dml/dml-copy-into-table#copy-options).
 
 
 ## Two modes
