@@ -264,7 +264,7 @@ func (s *MysqlSource) QueryTableData(threadNum int, conditionSql string) ([][]in
 	}
 	s.statsRecorder.RecordMetric(len(result))
 	stats := s.statsRecorder.Stats(time.Since(startTime))
-	log.Printf("thread-%d: extract %d rows (%f rows/s)", threadNum, len(result), stats.RowsPerSecondd)
+	log.Printf("thread-%d: extract %d rows (%f rows/s)", threadNum, len(result)+1, stats.RowsPerSecondd)
 
 	return result, columns, nil
 }
@@ -283,7 +283,6 @@ func (s *MysqlSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePattern
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("sourcedatabase pattern", sourceDatabasePattern)
 		match, err := regexp.MatchString(sourceDatabasePattern, database)
 		if err != nil {
 			return nil, err
