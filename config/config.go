@@ -91,6 +91,9 @@ func preCheckConfig(cfg *Config) {
 	if cfg.UserStage == "" {
 		cfg.UserStage = "~"
 	}
+	if cfg.MaxThread == 0 {
+		cfg.MaxThread = 1
+	}
 	if cfg.SourceSplitKey != "" && cfg.SourceSplitTimeKey != "" {
 		panic("cannot set both sourceSplitKey and sourceSplitTimeKey")
 	}
