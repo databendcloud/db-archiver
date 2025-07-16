@@ -288,7 +288,7 @@ func (p *OracleSource) QueryTableData(threadNum int, conditionSql string) ([][]i
 	}
 	p.statsRecorder.RecordMetric(len(result))
 	stats := p.statsRecorder.Stats(time.Since(startTime))
-	log.Printf("thread-%d: extract %d rows (%f rows/s)", threadNum, len(result), stats.RowsPerSecondd)
+	log.Printf("thread-%d: extract %d rows (%f rows/s)", threadNum, len(result)+1, stats.RowsPerSecondd)
 
 	return result, columns, nil
 }

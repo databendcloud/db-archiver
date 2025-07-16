@@ -409,7 +409,6 @@ func (s *SQLServerSource) GetDatabasesAccordingToSourceDbRegex(sourceDatabasePat
 			return nil, fmt.Errorf("scanning database name: %w", err)
 		}
 
-		fmt.Println("sourcedatabase pattern:", sourceDatabasePattern)
 		match, err := regexp.MatchString(sourceDatabasePattern, database)
 		if err != nil {
 			return nil, fmt.Errorf("matching pattern: %w", err)
