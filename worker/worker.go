@@ -60,7 +60,7 @@ func (w *Worker) stepBatchWithCondition(threadNum int, conditionSql string) erro
 	w.statsRecorder.RecordMetric(AlreadyIngestBytes, AlreadyIngestRows)
 	stats := w.statsRecorder.Stats(time.Since(startTime))
 	log.Printf("Globla speed: total ingested %d rows (%f rows/s), %d bytes (%f bytes/s)",
-		AlreadyIngestRows, stats.RowsPerSecond, AlreadyIngestBytes, stats.BytesPerSecond)
+		AlreadyIngestRows+1, stats.RowsPerSecond, AlreadyIngestBytes, stats.BytesPerSecond)
 
 	if err != nil {
 		logrus.Errorf("Failed to ingest data between %s into Databend: %v", conditionSql, err)
